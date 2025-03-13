@@ -52,7 +52,7 @@ async fn main(mut server_req: Request<IncomingBody>, responder: Responder) -> Fi
                     .map_err(|_http_err| {
                         std::io::Error::new(
                             std::io::ErrorKind::InvalidData,
-                            "Failed to read HTTP request body",
+                            "Failed write the HTTP request body",
                         )
                     })
                     .and(res)
