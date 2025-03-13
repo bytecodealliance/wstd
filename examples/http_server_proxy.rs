@@ -1,12 +1,14 @@
 // Run the example with:
-// wasmtime serve -Scli -Shttp --env TARGET_URL=https://example.com http_server_proxy.wasm
+// cargo build --example http_server_proxy --target=wasm32-wasip2
+// wasmtime serve -Scli -Shttp --env TARGET_URL=https://example.com/ target/wasm32-wasip2/debug/examples/http_server_proxy.wasm
+// Test with `curl --no-buffer -v 127.0.0.1:8080/proxy/`
 use futures_concurrency::prelude::*;
 use wstd::http::body::{BodyForthcoming, IncomingBody};
 use wstd::http::server::{Finished, Responder};
 use wstd::http::{Client, Request, Response, StatusCode, Uri};
 use wstd::io::{copy, empty};
 
-const PROXY_PREFIX: &str = "/proxy";
+const PROXY_PREFIX: &str = "/proxy/";
 
 #[wstd::http_server]
 async fn main(mut server_req: Request<IncomingBody>, responder: Responder) -> Finished {
@@ -23,6 +25,7 @@ async fn main(mut server_req: Request<IncomingBody>, responder: Responder) -> Fi
             )
             .parse()
             .expect("final target url should be parseable");
+            println!("Proxying to {target_url}");
 
             let client = Client::new();
             let mut client_req = Request::builder();
@@ -45,9 +48,14 @@ async fn main(mut server_req: Request<IncomingBody>, responder: Responder) -> Fi
             // Copy the server request body to client's request body.
             let server_req_to_client_req = async {
                 let res = copy(server_req.body_mut(), &mut client_request_body).await;
-                // TODO: Convert to io error if necessary
-                let _ = Client::finish(client_request_body, None);
-                res
+                Client::finish(client_request_body, None)
+                    .map_err(|_http_err| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Failed to read HTTP request body",
+                        )
+                    })
+                    .and(res)
             };
 
             // Copy the client response headers to server response.
