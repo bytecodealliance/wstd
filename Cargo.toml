@@ -47,7 +47,7 @@ resolver = "2"
 [workspace.package]
 version = "0.5.3"
 edition = "2021"
-license = "MIT OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception"
+license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/yoshuawuyts/wstd"
 keywords = ["WebAssembly", "async", "stdlib", "Components"]
 categories = ["wasm", "asynchronous"]

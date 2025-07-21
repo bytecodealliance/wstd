@@ -5,6 +5,8 @@
   </strong>
 </div>
 
+  <strong>A <a href="https://bytecodealliance.org/">Bytecode Alliance</a> project</strong>
+
 <br />
 
 <div align="center">
@@ -98,8 +100,8 @@ look at some of these issues:
 ## License
 
 <sup>
-Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
-2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
+Licensed under <a href="LICENSE-Apache-2.0_WITH_LLVM-exception">Apache
+License, Version 2.0 with LLVM Exception</a>.
 </sup>
 
 <br/>
