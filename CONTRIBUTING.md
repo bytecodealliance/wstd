@@ -20,9 +20,9 @@ misleading, or incorrect.
 Before creating a nontrivial PR to wstd, we suggest you first [file an issue]
 to propose and discuss the change.
 
-[file an issue]: https://github.com/yoshuawuyts/wstd/issues
+[file an issue]: https://github.com/bytecodealliance/wstd/issues
 [rust docs]: https://docs.rs/wstd/latest/wstd
-[examples]: https://github.com/yoshuawuyts/wstd/tree/main/examples
+[examples]: https://github.com/bytecodealliance/wstd/tree/main/examples
 
 ## Join Our Chat
 
