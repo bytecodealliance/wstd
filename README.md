@@ -1,11 +1,13 @@
 <h1 align="center">wstd</h1>
 <div align="center">
   <strong>
-    An async standard library for Wasm Components and WASI 0.2
+    An async Rust standard library for Wasm Components and WASI 0.2
   </strong>
 </div>
 
+<div align="center">
   <strong>A <a href="https://bytecodealliance.org/">Bytecode Alliance</a> project</strong>
+</div>
 
 <br />
 
@@ -33,19 +35,19 @@
       API Docs
     </a>
     <span> | </span>
-    <a href="https://github.com/yoshuawuyts/wstd/releases">
+    <a href="https://github.com/bytecodealliance/wstd/releases">
       Releases
     </a>
     <span> | </span>
-    <a href="https://github.com/yoshuawuyts/wstd/blob/master.github/CONTRIBUTING.md">
+    <a href="https://github.com/bytecodealliance/wstd/blob/main/CONTRIBUTING.md">
       Contributing
     </a>
   </h3>
 </div>
 
 
-This is a minimal async standard library written exclusively to support Wasm
-Components. It exists primarily to enable people to write async-based
+This is a minimal async Rust standard library written exclusively to support
+Wasm Components. It exists primarily to enable people to write async-based
 applications in Rust before async-std, smol, or tokio land support for Wasm
 Components and WASI 0.2. Once those runtimes land support, it is recommended
 users switch to use those instead.
@@ -93,9 +95,9 @@ look at some of these issues:
 - [Issues labeled "good first issue"][good-first-issue]
 - [Issues labeled "help wanted"][help-wanted]
 
-[contributing]: https://github.com/yoshuawuyts/wstd/blob/master.github/CONTRIBUTING.md
-[good-first-issue]: https://github.com/yoshuawuyts/wstd/labels/good%20first%20issue
-[help-wanted]: https://github.com/yoshuawuyts/wstd/labels/help%20wanted
+[contributing]: https://github.com/bytecodealliance/wstd/blob/main/CONTRIBUTING.md
+[good-first-issue]: https://github.com/bytecodealliance/wstd/labels/good%20first%20issue
+[help-wanted]: https://github.com/bytecodealliance/wstd/labels/help%20wanted
 
 ## License
 
@@ -108,6 +110,7 @@ License, Version 2.0 with LLVM Exception</a>.
 
 <sub>
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
-be dual licensed as above, without any additional terms or conditions.
+for inclusion in this crate by you, as defined in the Apache-2.0 license with
+LLVM Exception, shall be licensed as above, without any additional terms or
+conditions.
 </sub>
