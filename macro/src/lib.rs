@@ -68,7 +68,7 @@ pub fn attr_macro_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let output = input.sig.output;
     let block = input.block;
     quote! {
-        #[test]
+        #[::core::prelude::v1::test]
         pub fn #name() #output {
 
             #(#attrs)*
