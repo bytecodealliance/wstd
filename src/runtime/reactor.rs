@@ -321,4 +321,31 @@ mod test {
             );
         })
     }
+
+    #[test]
+    fn cooperative_concurrency() {
+        crate::runtime::block_on(async {
+            let cpu_heavy = async move {
+                // Simulating a CPU-heavy task that runs for 1 second and yields occasionally
+                for _ in 0..10 {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    futures_lite::future::yield_now().await;
+                }
+                true
+            };
+            let timeout = async move {
+                crate::time::Timer::after(crate::time::Duration::from_millis(200))
+                    .wait()
+                    .await;
+                false
+            };
+            let mut future_group = futures_concurrency::future::FutureGroup::<
+                Pin<Box<dyn std::future::Future<Output = bool>>>,
+            >::new();
+            future_group.insert(Box::pin(cpu_heavy));
+            future_group.insert(Box::pin(timeout));
+            let result = futures_lite::StreamExt::next(&mut future_group).await;
+            assert_eq!(result, Some(false), "cpu_heavy task should have timed out");
+        });
+    }
 }
