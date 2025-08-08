@@ -37,6 +37,7 @@ where
                 // as awake, reset and poll again. otherwise, block until a
                 // pollable wakes a future.
                 if root.is_awake() {
+                    reactor.nonblock_check_pollables();
                     root.reset()
                 } else {
                     reactor.block_on_pollables()

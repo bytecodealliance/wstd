@@ -128,7 +128,57 @@ impl Reactor {
 
     /// Block until at least one pending pollable is ready, waking a pending future.
     pub(crate) fn block_on_pollables(&self) {
+        self.check_pollables(|targets| {
+            debug_assert_ne!(
+                targets.len(),
+                0,
+                "Attempting to block on an empty list of pollables - without any pending work, no progress can be made and wasi::io::poll::poll will trap"
+            );
+            wasi::io::poll::poll(targets)
+
+        })
+    }
+
+    /// Without blocking, check for any ready pollables and wake the
+    /// associated futures.
+    pub(crate) fn nonblock_check_pollables(&self) {
+        // Lazily create a pollable which always resolves to ready.
+        use std::sync::LazyLock;
+        static READY_POLLABLE: LazyLock<Pollable> =
+            LazyLock::new(|| wasi::clocks::monotonic_clock::subscribe_duration(0));
+
+        self.check_pollables(|targets| {
+            // Create a new set of targets, with the addition of the ready
+            // pollable:
+            let ready_index = targets.len();
+            let mut new_targets = Vec::with_capacity(ready_index + 1);
+            new_targets.extend_from_slice(targets);
+            new_targets.push(&*READY_POLLABLE);
+
+            // Poll is now guaranteed to return immediately, because at least
+            // one member is ready:
+            let mut ready_list = wasi::io::poll::poll(&new_targets);
+
+            // Erase our extra ready pollable from the ready list:
+            ready_list.retain(|e| *e != ready_index as u32);
+            ready_list
+        })
+    }
+
+    /// Common core of blocking and nonblocking pollable checks. Wakes any
+    /// futures which are pending on the pollables, according to the result of
+    /// the check_ready function.
+    fn check_pollables<F>(&self, check_ready: F)
+    where
+        F: FnOnce(&[&Pollable]) -> Vec<u32>,
+    {
         let reactor = self.inner.borrow();
+
+        // If no wakers are pending on pollables, there is no work to be done
+        // here:
+        if reactor.wakers.is_empty() {
+            return;
+        }
 
         // We're about to wait for a number of pollables. When they wake we get
         // the *indexes* back for the pollables whose events were available - so
@@ -144,15 +194,9 @@ impl Reactor {
             targets.push(&reactor.pollables[pollable_index.0]);
         }
 
-        debug_assert_ne!(
-            targets.len(),
-            0,
-            "Attempting to block on an empty list of pollables - without any pending work, no progress can be made and wasi::io::poll::poll will trap"
-        );
-
-        // Now that we have that association, we're ready to poll our targets.
-        // This will block until an event has completed.
-        let ready_indexes = wasi::io::poll::poll(&targets);
+        // Now that we have that association, we're ready to check our targets for readiness.
+        // (This is either a wasi poll, or the nonblocking variant.)
+        let ready_indexes = check_ready(&targets);
 
         // Once we have the indexes for which pollables are available, we need
         // to convert it back to the right keys for the wakers. Earlier we
