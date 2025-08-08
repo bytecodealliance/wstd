@@ -23,7 +23,7 @@
 //!
 //! **HTTP Client**
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 #![doc = include_str!("../tests/http_get.rs")]
 //! ```
 //!

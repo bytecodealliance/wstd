@@ -5,6 +5,7 @@
 //! using the [`http_server`] macro:
 //!
 //! ```no_run
+//! # use wstd::http::{Request, Response, IntoBody, server::{Finished, Responder}, body::IncomingBody};
 //! #[wstd::http_server]
 //! async fn main(request: Request<IncomingBody>, responder: Responder) -> Finished {
 //!     responder
@@ -49,7 +50,7 @@ impl Responder {
     /// # Example
     ///
     /// ```
-    /// # use wstd::http::{body::IncomingBody, BodyForthcoming, Response, Request};
+    /// # use wstd::http::{body::{IncomingBody, BodyForthcoming}, Response, Request};
     /// # use wstd::http::server::{Finished, Responder};
     /// # use crate::wstd::io::AsyncWrite;
     /// # async fn example(responder: Responder) -> Finished {
@@ -59,6 +60,7 @@ impl Responder {
     ///         .await;
     ///     Finished::finish(body, result, None)
     /// # }
+    /// # fn main() {}
     /// ```
     pub fn start_response(self, response: Response<BodyForthcoming>) -> OutgoingBody {
         let wasi_headers = header_map_to_wasi(response.headers()).expect("header error");
@@ -87,7 +89,7 @@ impl Responder {
     /// # Example
     ///
     /// ```
-    /// # use wstd::http::{body::IncomingBody, BodyForthcoming, IntoBody, Response, Request};
+    /// # use wstd::http::{body::{IncomingBody, BodyForthcoming}, IntoBody, Response, Request};
     /// # use wstd::http::server::{Finished, Responder};
     /// #
     /// # async fn example(responder: Responder) -> Finished {
@@ -95,6 +97,7 @@ impl Responder {
     ///         .respond(Response::new("Hello!\n".into_body()))
     ///         .await
     /// # }
+    /// # fn main() {}
     /// ```
     pub async fn respond<B: Body>(self, response: Response<B>) -> Finished {
         let headers = response.headers();
