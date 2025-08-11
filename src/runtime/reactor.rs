@@ -126,7 +126,15 @@ impl Reactor {
         }
     }
 
+    /// The reactor tracks the set of WASI pollables which have an associated
+    /// Future pending on their readiness. This function returns indicating
+    /// that set of pollables is not empty.
+    pub(crate) fn nonempty_pending_pollables(&self) -> bool {
+        !self.inner.borrow().wakers.is_empty()
+    }
+
     /// Block until at least one pending pollable is ready, waking a pending future.
+    /// Precondition: self.nonempty_pending_pollables() is true.
     pub(crate) fn block_on_pollables(&self) {
         self.check_pollables(|targets| {
             debug_assert_ne!(
@@ -142,6 +150,11 @@ impl Reactor {
     /// Without blocking, check for any ready pollables and wake the
     /// associated futures.
     pub(crate) fn nonblock_check_pollables(&self) {
+        // If there are no pollables with associated pending futures, there is
+        // no work to do here, so return immediately.
+        if !self.nonempty_pending_pollables() {
+            return;
+        }
         // Lazily create a pollable which always resolves to ready.
         use std::sync::LazyLock;
         static READY_POLLABLE: LazyLock<Pollable> =
@@ -168,17 +181,12 @@ impl Reactor {
     /// Common core of blocking and nonblocking pollable checks. Wakes any
     /// futures which are pending on the pollables, according to the result of
     /// the check_ready function.
+    /// Precondition: self.nonempty_pending_pollables() is true.
     fn check_pollables<F>(&self, check_ready: F)
     where
         F: FnOnce(&[&Pollable]) -> Vec<u32>,
     {
         let reactor = self.inner.borrow();
-
-        // If no wakers are pending on pollables, there is no work to be done
-        // here:
-        if reactor.wakers.is_empty() {
-            return;
-        }
 
         // We're about to wait for a number of pollables. When they wake we get
         // the *indexes* back for the pollables whose events were available - so
