@@ -17,17 +17,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        rust: [stable]
 
     steps:
     - uses: actions/checkout@master
 
-    - name: Install ${{ matrix.rust }}
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.rust }}
-        target: wasm32-wasip2
-        override: true
+    - uses: ./.github/actions/install-rust
 
     - name: Install wasmtime
       uses: bytecodealliance/actions/wasmtime/setup@v1
@@ -56,12 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        target: wasm32-wasip2
-        components: rustfmt, clippy
-        override: true
+    - uses: ./.github/actions/install-rust
 
     - name: fmt
       run: cargo fmt --all -- --check
