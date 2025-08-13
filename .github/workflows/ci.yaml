@@ -60,3 +60,17 @@ jobs:
 
     - name: Clippy
       run: cargo clippy --all
+
+  verify-publish:
+    name: Verify publish
+    if: github.repository_owner == 'bytecodealliance'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: ./.github/actions/install-rust
+    - run: rustc ci/publish.rs
+    # Make sure we can bump version numbers for the next release
+    - run: ./publish bump
+    # Make sure the tree is publish-able as-is
+    - run: ./publish verify
+
