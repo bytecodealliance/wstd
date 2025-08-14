@@ -47,7 +47,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.5.3"
+version = "0.5.4"
 edition = "2021"
 license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/yoshuawuyts/wstd"
@@ -87,7 +87,7 @@ wasmtime = "26"
 wasmtime-wasi = "26"
 wasmtime-wasi-http = "26"
 wstd = { path = "." }
-wstd-macro = { path = "macro", version = "=0.5.3" }
+wstd-macro = { path = "macro", version = "=0.5.4" }
 
 [package.metadata.docs.rs]
 all-features = true
