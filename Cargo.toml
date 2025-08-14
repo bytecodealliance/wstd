@@ -50,7 +50,7 @@ resolver = "2"
 version = "0.5.4"
 edition = "2021"
 license = "Apache-2.0 WITH LLVM-exception"
-repository = "https://github.com/yoshuawuyts/wstd"
+repository = "https://github.com/bytecodealliance/wstd"
 keywords = ["WebAssembly", "async", "stdlib", "Components"]
 categories = ["wasm", "asynchronous"]
 # Rust-version policy: stable N-2, same as wasmtime.
