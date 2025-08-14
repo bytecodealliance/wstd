@@ -32,6 +32,7 @@ serde_json = { workspace = true, optional = true }
 anyhow.workspace = true
 clap.workspace = true
 futures-lite.workspace = true
+futures-concurrency.workspace = true
 humantime.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -63,6 +64,7 @@ cargo_metadata = "0.18.1"
 clap = { version = "4.5.26", features = ["derive"] }
 futures-core = "0.3.19"
 futures-lite = "1.12.0"
+futures-concurrency = "7.6"
 humantime = "2.1.0"
 heck = "0.5"
 http = "1.1"

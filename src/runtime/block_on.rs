@@ -37,8 +37,17 @@ where
                 // as awake, reset and poll again. otherwise, block until a
                 // pollable wakes a future.
                 if root.is_awake() {
+                    reactor.nonblock_check_pollables();
                     root.reset()
                 } else {
+                    // If there are no futures awake or waiting on a WASI
+                    // pollable, its impossible for the reactor to make
+                    // progress, and the only valid behaviors are to sleep
+                    // forever or panic. This should only be reachable if the
+                    // user's Futures are implemented incorrectly.
+                    if !reactor.nonempty_pending_pollables() {
+                        panic!("reactor has no futures which are awake, or are waiting on a WASI pollable to be ready")
+                    }
                     reactor.block_on_pollables()
                 }
             }
