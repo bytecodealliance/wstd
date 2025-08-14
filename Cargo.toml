@@ -10,6 +10,7 @@ authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 
 [features]
 default = ["json"]
@@ -52,6 +53,8 @@ license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/yoshuawuyts/wstd"
 keywords = ["WebAssembly", "async", "stdlib", "Components"]
 categories = ["wasm", "asynchronous"]
+# Rust-version policy: stable N-2, same as wasmtime.
+rust-version = "1.87"
 authors = [
     "Yoshua Wuyts <rust@yosh.is>",
     "Pat Hickey <pat@moreproductive.org>",
