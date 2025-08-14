@@ -406,7 +406,7 @@ crate {name} is not owned by wasmtime-publish, please run:
                 "
 crate {name} is not exclusively owned by wasmtime-publish
 
-Please contact wasm-tools maintainers to ensure that `wasmtime-publish` is the
+Please contact wstd maintainers to ensure that `wasmtime-publish` is the
 only listed owner of the crate.
 ",
                 name = name,
@@ -419,7 +419,7 @@ fn curl(url: &str) -> Option<String> {
     let output = cmd_output(
         Command::new("curl")
             .arg("--user-agent")
-            .arg("bytecodealliance/wit-bindgen auto-publish script")
+            .arg("bytecodealliance/wstd auto-publish script")
             .arg(url),
     );
     if !output.status.success() {
