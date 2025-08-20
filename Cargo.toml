@@ -32,6 +32,7 @@ serde_json = { workspace = true, optional = true }
 [dev-dependencies]
 anyhow.workspace = true
 clap.workspace = true
+futures-concurrency.workspace = true
 futures-lite.workspace = true
 futures-concurrency.workspace = true
 humantime.workspace = true
@@ -65,6 +66,7 @@ authors = [
 anyhow = "1"
 cargo_metadata = "0.18.1"
 clap = { version = "4.5.26", features = ["derive"] }
+futures-concurrency = "7.6.3"
 futures-core = "0.3.19"
 futures-lite = "1.12.0"
 futures-concurrency = "7.6"
