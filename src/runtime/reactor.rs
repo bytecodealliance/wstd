@@ -40,8 +40,8 @@ impl AsyncPollable {
     }
     /// Create a Future that waits for the Pollable's readiness.
     pub fn wait_for(&self) -> WaitFor {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
         WaitFor {
             waitee: Waitee {
@@ -58,7 +58,7 @@ struct Waitee {
     /// This needs to be a reference counted registration, because it may outlive the AsyncPollable
     /// &self that it was created from.
     pollable: AsyncPollable,
-    unique: usize,
+    unique: u64,
 }
 
 /// A Future that waits for the Pollable's readiness.
