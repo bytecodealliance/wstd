@@ -17,7 +17,6 @@ default = ["json"]
 json = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-futures-core.workspace = true
 http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
