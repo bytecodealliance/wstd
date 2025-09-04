@@ -38,7 +38,6 @@ impl BodyKind {
 }
 
 /// A trait representing an HTTP body.
-#[doc(hidden)]
 pub trait Body: AsyncRead {
     /// Returns the exact remaining length of the iterator, if known.
     fn len(&self) -> Option<usize>;
@@ -49,6 +48,31 @@ pub trait Body: AsyncRead {
     }
 }
 
+/// A boxed trait object for a `Body`.
+pub struct BoxBody(pub Box<dyn Body>);
+impl BoxBody {
+    fn new(body: impl Body + 'static) -> Self {
+        BoxBody(Box::new(body))
+    }
+}
+#[async_trait::async_trait(?Send)]
+impl AsyncRead for BoxBody {
+    async fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
+        self.0.read(buf).await
+    }
+}
+impl Body for BoxBody {
+    /// Returns the exact remaining length of the iterator, if known.
+    fn len(&self) -> Option<usize> {
+        self.0.len()
+    }
+
+    /// Returns `true` if the body is known to be empty.
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 /// Conversion into a `Body`.
 #[doc(hidden)]
 pub trait IntoBody {
@@ -56,6 +80,15 @@ pub trait IntoBody {
     type IntoBody: Body;
     /// Convert into `Body`.
     fn into_body(self) -> Self::IntoBody;
+
+    /// Convert into `BoxBody`.
+    fn into_boxed_body(self) -> BoxBody
+    where
+        Self: Sized,
+        Self::IntoBody: 'static,
+    {
+        BoxBody::new(self.into_body())
+    }
 }
 impl<T> IntoBody for T
 where
@@ -99,6 +132,7 @@ impl IntoBody for &[u8] {
 #[derive(Debug)]
 pub struct BoundedBody<T>(Cursor<T>);
 
+#[async_trait::async_trait(?Send)]
 impl<T: AsRef<[u8]>> AsyncRead for BoundedBody<T> {
     async fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
         self.0.read(buf).await
@@ -120,6 +154,8 @@ impl<S: AsyncRead> StreamedBody<S> {
         Self(s)
     }
 }
+
+#[async_trait::async_trait(?Send)]
 impl<S: AsyncRead> AsyncRead for StreamedBody<S> {
     async fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
         self.0.read(buf).await
@@ -214,6 +250,7 @@ impl IncomingBody {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl AsyncRead for IncomingBody {
     async fn read(&mut self, out_buf: &mut [u8]) -> crate::io::Result<usize> {
         self.body_stream.read(out_buf).await
@@ -309,6 +346,7 @@ impl OutgoingBody {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl AsyncWrite for OutgoingBody {
     async fn write(&mut self, buf: &[u8]) -> crate::io::Result<usize> {
         self.stream.write(buf).await

@@ -2,6 +2,7 @@ use crate::io;
 
 const CHUNK_SIZE: usize = 2048;
 
+#[async_trait::async_trait(?Send)]
 /// Read bytes from a source.
 pub trait AsyncRead {
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
@@ -33,6 +34,7 @@ pub trait AsyncRead {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl<R: AsyncRead + ?Sized> AsyncRead for &mut R {
     #[inline]
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {

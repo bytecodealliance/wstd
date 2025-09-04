@@ -92,10 +92,8 @@ pub fn attr_macro_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[wstd::http_server]
-/// async fn main(request: Request<IncomingBody>, responder: Responder) -> Finished {
-///     responder
-///         .respond(Response::new("Hello!\n".into_body()))
-///         .await
+/// async fn main(request: Request<IncomingBody>) -> Result<Response<impl Body>> {
+///     Ok(Response::new("Hello!\n".into_body()))
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -137,12 +135,15 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
                 }
 
                 let responder = ::wstd::http::server::Responder::new(response_out);
-                let _finished: ::wstd::http::server::Finished =
-                    match ::wstd::http::request::try_from_incoming(request)
-                {
-                    Ok(request) => ::wstd::runtime::block_on(async { __run(request, responder).await }),
+                match ::wstd::http::request::try_from_incoming(request) {
+                    Ok(request) => ::wstd::runtime::block_on(async move {
+                        match __run(request).await {
+                            Ok(response) => responder.respond(response),
+                            Err(err) => responder.fail(err),
+                        }
+                    }),
                     Err(err) => responder.fail(err),
-                };
+                }
             }
         }
 

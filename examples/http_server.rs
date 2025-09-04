@@ -1,30 +1,33 @@
-use wstd::http::body::{BodyForthcoming, IncomingBody, OutgoingBody};
-use wstd::http::server::{Finished, Responder};
-use wstd::http::{IntoBody, Request, Response, StatusCode};
+use anyhow::Result;
+use wstd::http::body::{BodyForthcoming, BoxBody, IncomingBody, OutgoingBody};
+use wstd::http::{Body, IntoBody, Request, Response, StatusCode};
 use wstd::io::{copy, empty, AsyncWrite};
 use wstd::time::{Duration, Instant};
 
 #[wstd::http_server]
-async fn main(request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn main(request: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     match request.uri().path_and_query().unwrap().as_str() {
+        /*
         "/wait" => http_wait(request, responder).await,
         "/echo" => http_echo(request, responder).await,
         "/echo-headers" => http_echo_headers(request, responder).await,
         "/echo-trailers" => http_echo_trailers(request, responder).await,
         "/fail" => http_fail(request, responder).await,
         "/bigfail" => http_bigfail(request, responder).await,
-        "/" => http_home(request, responder).await,
-        _ => http_not_found(request, responder).await,
+        */
+        "/" => http_home(request).await,
+        _ => http_not_found(request).await,
     }
 }
 
-async fn http_home(_request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn http_home(_request: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     // To send a single string as the response body, use `Responder::respond`.
-    responder
-        .respond(Response::new("Hello, wasi:http/proxy world!\n".into_body()))
-        .await
+    Ok(Response::new(
+        "Hello, wasi:http/proxy world!\n".into_boxed_body(),
+    ))
 }
 
+/*
 async fn http_wait(_request: Request<IncomingBody>, responder: Responder) -> Finished {
     // Get the time now
     let now = Instant::now();
@@ -84,11 +87,12 @@ async fn http_echo_trailers(request: Request<IncomingBody>, responder: Responder
     };
     Finished::finish(body, result, trailers)
 }
+*/
 
-async fn http_not_found(_request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn http_not_found(_request: Request<IncomingBody>) -> Result<Response<BoxBody>> {
     let response = Response::builder()
         .status(StatusCode::NOT_FOUND)
-        .body(empty())
+        .body(empty().into_boxed_body())
         .unwrap();
-    responder.respond(response).await
+    Ok(response)
 }

@@ -18,6 +18,7 @@ json = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 async-task.workspace = true
+async-trait.workspace = true
 http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
@@ -64,6 +65,7 @@ authors = [
 [workspace.dependencies]
 anyhow = "1"
 async-task = "4.7"
+async-trait = "*"
 cargo_metadata = "0.18.1"
 clap = { version = "4.5.26", features = ["derive"] }
 futures-core = "0.3.19"

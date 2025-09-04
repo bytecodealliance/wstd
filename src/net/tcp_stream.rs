@@ -40,6 +40,7 @@ impl Drop for TcpStream {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl io::AsyncRead for TcpStream {
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.input.read(buf).await
@@ -50,6 +51,7 @@ impl io::AsyncRead for TcpStream {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl io::AsyncRead for &TcpStream {
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.input.read(buf).await
@@ -60,6 +62,7 @@ impl io::AsyncRead for &TcpStream {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl io::AsyncWrite for TcpStream {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.output.write(buf).await
@@ -74,6 +77,7 @@ impl io::AsyncWrite for TcpStream {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl io::AsyncWrite for &TcpStream {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.output.write(buf).await
@@ -89,6 +93,7 @@ impl io::AsyncWrite for &TcpStream {
 }
 
 pub struct ReadHalf<'a>(&'a TcpStream);
+#[async_trait::async_trait(?Send)]
 impl<'a> io::AsyncRead for ReadHalf<'a> {
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf).await
@@ -109,6 +114,7 @@ impl<'a> Drop for ReadHalf<'a> {
 }
 
 pub struct WriteHalf<'a>(&'a TcpStream);
+#[async_trait::async_trait(?Send)]
 impl<'a> io::AsyncWrite for WriteHalf<'a> {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf).await
