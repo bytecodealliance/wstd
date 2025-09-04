@@ -21,6 +21,12 @@ fn main() {
         test_programs_root.as_os_str().to_str().unwrap()
     );
 
+    let wstd_root = test_programs_root.parent().unwrap();
+    println!(
+        "cargo:rerun-if-changed={}",
+        wstd_root.as_os_str().to_str().unwrap()
+    );
+
     let status = Command::new("cargo")
         .arg("build")
         .arg("--target=wasm32-wasip2")

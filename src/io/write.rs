@@ -1,6 +1,7 @@
 use crate::io;
 
 /// Write bytes to a sink.
+#[async_trait::async_trait(?Send)]
 pub trait AsyncWrite {
     // Required methods
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize>;
@@ -25,6 +26,7 @@ pub trait AsyncWrite {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl<W: AsyncWrite + ?Sized> AsyncWrite for &mut W {
     #[inline]
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

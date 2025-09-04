@@ -73,7 +73,7 @@ impl AsyncInputStream {
         Ok(len)
     }
 
-    /// Use this `AsyncInputStream` as a `futures_core::stream::Stream` with
+    /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most 8k. If you want to control chunk size, use
     /// `Self::into_stream_of`.
@@ -84,7 +84,7 @@ impl AsyncInputStream {
         }
     }
 
-    /// Use this `AsyncInputStream` as a `futures_core::stream::Stream` with
+    /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most the `chunk_size` argument specified.
     pub fn into_stream_of(self, chunk_size: usize) -> AsyncInputChunkStream {
@@ -94,7 +94,7 @@ impl AsyncInputStream {
         }
     }
 
-    /// Use this `AsyncInputStream` as a `futures_core::stream::Stream` with
+    /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<u8, std::io::Error>`.
     pub fn into_bytestream(self) -> AsyncInputByteStream {
         AsyncInputByteStream {
@@ -104,6 +104,7 @@ impl AsyncInputStream {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl AsyncRead for AsyncInputStream {
     async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         Self::read(self, buf).await
@@ -115,7 +116,7 @@ impl AsyncRead for AsyncInputStream {
     }
 }
 
-/// Wrapper of `AsyncInputStream` that impls `futures_core::stream::Stream`
+/// Wrapper of `AsyncInputStream` that impls `futures_lite::stream::Stream`
 /// with an item of `Result<Vec<u8>, std::io::Error>`
 pub struct AsyncInputChunkStream {
     stream: AsyncInputStream,
@@ -129,7 +130,7 @@ impl AsyncInputChunkStream {
     }
 }
 
-impl futures_core::stream::Stream for AsyncInputChunkStream {
+impl futures_lite::stream::Stream for AsyncInputChunkStream {
     type Item = Result<Vec<u8>, std::io::Error>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.stream.poll_ready(cx) {
@@ -148,7 +149,7 @@ impl futures_core::stream::Stream for AsyncInputChunkStream {
 
 pin_project_lite::pin_project! {
     /// Wrapper of `AsyncInputStream` that impls
-    /// `futures_core::stream::Stream` with item `Result<u8, std::io::Error>`.
+    /// `futures_lite::stream::Stream` with item `Result<u8, std::io::Error>`.
     pub struct AsyncInputByteStream {
         #[pin]
         stream: AsyncInputChunkStream,
@@ -170,13 +171,13 @@ impl AsyncInputByteStream {
     }
 }
 
-impl futures_core::stream::Stream for AsyncInputByteStream {
+impl futures_lite::stream::Stream for AsyncInputByteStream {
     type Item = Result<u8, std::io::Error>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
         match this.buffer.next() {
             Some(byte) => Poll::Ready(Some(Ok(byte.expect("cursor on Vec<u8> is infallible")))),
-            None => match futures_core::stream::Stream::poll_next(this.stream, cx) {
+            None => match futures_lite::stream::Stream::poll_next(this.stream, cx) {
                 Poll::Ready(Some(Ok(bytes))) => {
                     let mut bytes = std::io::Read::bytes(std::io::Cursor::new(bytes));
                     match bytes.next() {
@@ -287,6 +288,8 @@ impl AsyncOutputStream {
         }
     }
 }
+
+#[async_trait::async_trait(?Send)]
 impl AsyncWrite for AsyncOutputStream {
     // Required methods
     async fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {

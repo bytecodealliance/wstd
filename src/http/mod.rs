@@ -4,9 +4,9 @@ pub use http::status::StatusCode;
 pub use http::uri::{Authority, PathAndQuery, Uri};
 
 #[doc(inline)]
-pub use body::{Body, IntoBody};
+pub use body::{util::BodyExt, Body, Incoming};
 pub use client::Client;
-pub use error::{Error, Result};
+pub use error::{Error, ErrorCode, Result};
 pub use fields::{HeaderMap, HeaderName, HeaderValue};
 pub use method::Method;
 pub use request::Request;

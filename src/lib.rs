@@ -81,7 +81,6 @@ pub mod __internal {
 
 pub mod prelude {
     pub use crate::future::FutureExt as _;
-    pub use crate::http::Body as _;
     pub use crate::io::AsyncRead as _;
     pub use crate::io::AsyncWrite as _;
 }

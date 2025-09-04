@@ -1,353 +1,500 @@
-//! HTTP body types
-
-use crate::http::fields::header_map_from_wasi;
-use crate::io::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Cursor, Empty};
-use crate::runtime::AsyncPollable;
-use core::fmt;
-use http::header::CONTENT_LENGTH;
-use wasip2::http::types::IncomingBody as WasiIncomingBody;
-
-#[cfg(feature = "json")]
-use serde::de::DeserializeOwned;
-#[cfg(feature = "json")]
-use serde_json;
-
-pub use super::{
-    error::{Error, ErrorVariant},
-    HeaderMap,
+use crate::http::{
+    error::Context as _,
+    fields::{header_map_from_wasi, header_map_to_wasi},
+    Error, HeaderMap,
 };
+use crate::io::{AsyncInputStream, AsyncOutputStream, AsyncWrite};
+use crate::runtime::{AsyncPollable, Reactor, WaitFor};
 
-#[derive(Debug)]
-pub(crate) enum BodyKind {
-    Fixed(u64),
-    Chunked,
+pub use ::http_body::{Body as HttpBody, Frame, SizeHint};
+pub use bytes::Bytes;
+
+use http::header::CONTENT_LENGTH;
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use std::fmt;
+use std::future::{poll_fn, Future};
+use std::pin::{pin, Pin};
+use std::task::{Context, Poll};
+use wasip2::http::types::{
+    FutureTrailers, IncomingBody as WasiIncomingBody, OutgoingBody as WasiOutgoingBody,
+};
+use wasip2::io::streams::{InputStream as WasiInputStream, StreamError};
+
+pub mod util {
+    pub use http_body_util::*;
 }
 
-impl BodyKind {
-    pub(crate) fn from_headers(headers: &HeaderMap) -> Result<BodyKind, InvalidContentLength> {
-        if let Some(value) = headers.get(CONTENT_LENGTH) {
-            let content_length = std::str::from_utf8(value.as_ref())
-                .unwrap()
+#[derive(Debug)]
+pub struct Body(pub(crate) BodyInner);
+
+#[derive(Debug)]
+pub(crate) enum BodyInner {
+    Boxed(UnsyncBoxBody<Bytes, Error>),
+    Incoming(Incoming),
+    Complete(Bytes),
+}
+
+impl Body {
+    pub async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
+        match self.0 {
+            BodyInner::Incoming(incoming) => {
+                let in_body = incoming.into_inner();
+                let mut in_stream =
+                    AsyncInputStream::new(in_body.stream().expect("incoming body already read"));
+                let mut out_stream = AsyncOutputStream::new(
+                    outgoing_body
+                        .write()
+                        .expect("outgoing body already written"),
+                );
+                crate::io::copy(&mut in_stream, &mut out_stream)
+                    .await
+                    .map_err(|e| {
+                        Error::from(e)
+                            .context("copying incoming body stream to outgoing body stream")
+                    })?;
+                drop(in_stream);
+                drop(out_stream);
+                let future_in_trailers = WasiIncomingBody::finish(in_body);
+                Reactor::current()
+                    .schedule(future_in_trailers.subscribe())
+                    .wait_for()
+                    .await;
+                let in_trailers: Option<wasip2::http::types::Fields> = future_in_trailers
+                    .get()
+                    .expect("pollable ready")
+                    .expect("got once")
+                    .map_err(|e| Error::from(e).context("recieving incoming trailers"))?;
+                WasiOutgoingBody::finish(outgoing_body, in_trailers)
+                    .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
+                Ok(())
+            }
+            BodyInner::Boxed(box_body) => {
+                let mut out_stream = AsyncOutputStream::new(
+                    outgoing_body
+                        .write()
+                        .expect("outgoing body already written"),
+                );
+                let mut body = pin!(box_body);
+                let mut trailers = None;
+                loop {
+                    match poll_fn(|cx| body.as_mut().poll_frame(cx)).await {
+                        Some(Ok(frame)) if frame.is_data() => {
+                            let data = frame.data_ref().unwrap();
+                            out_stream.write_all(data).await?;
+                        }
+                        Some(Ok(frame)) if frame.is_trailers() => {
+                            trailers =
+                                Some(header_map_to_wasi(frame.trailers_ref().unwrap()).map_err(
+                                    |e| Error::from(e).context("outoging trailers to wasi"),
+                                )?);
+                        }
+                        Some(Err(err)) => break Err(err.context("sending outgoing body")),
+                        None => {
+                            drop(out_stream);
+                            WasiOutgoingBody::finish(outgoing_body, trailers)
+                                .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
+                            break Ok(());
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            BodyInner::Complete(bytes) => {
+                let mut out_stream = AsyncOutputStream::new(
+                    outgoing_body
+                        .write()
+                        .expect("outgoing body already written"),
+                );
+                out_stream.write_all(&bytes).await?;
+                drop(out_stream);
+                WasiOutgoingBody::finish(outgoing_body, None)
+                    .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
+                Ok(())
+            }
+        }
+    }
+
+    pub fn into_boxed_body(self) -> UnsyncBoxBody<Bytes, Error> {
+        match self.0 {
+            BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
+            BodyInner::Complete(bytes) => http_body_util::Full::new(bytes)
+                .map_err(annotate_err)
+                .boxed_unsync(),
+            BodyInner::Boxed(b) => b,
+        }
+    }
+
+    pub fn as_boxed_body(&mut self) -> &mut UnsyncBoxBody<Bytes, Error> {
+        let mut prev = Self::empty();
+        std::mem::swap(self, &mut prev);
+        self.0 = BodyInner::Boxed(prev.into_boxed_body());
+
+        match &mut self.0 {
+            BodyInner::Boxed(ref mut b) => b,
+            _ => unreachable!(),
+        }
+    }
+
+    pub async fn contents(&mut self) -> Result<&[u8], Error> {
+        match &mut self.0 {
+            BodyInner::Complete(ref bs) => Ok(bs.as_ref()),
+            inner => {
+                let mut prev = BodyInner::Complete(Bytes::new());
+                std::mem::swap(inner, &mut prev);
+                let boxed_body = match prev {
+                    BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
+                    BodyInner::Boxed(b) => b,
+                    BodyInner::Complete(_) => unreachable!(),
+                };
+                let collected = boxed_body.collect().await?;
+                *inner = BodyInner::Complete(collected.to_bytes());
+                Ok(match inner {
+                    BodyInner::Complete(ref bs) => bs.as_ref(),
+                    _ => unreachable!(),
+                })
+            }
+        }
+    }
+
+    pub fn content_length(&self) -> Option<u64> {
+        match &self.0 {
+            BodyInner::Boxed(b) => b.size_hint().exact(),
+            BodyInner::Complete(bs) => Some(bs.len() as u64),
+            BodyInner::Incoming(i) => i.size_hint.content_length(),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Body(BodyInner::Complete(Bytes::new()))
+    }
+
+    pub fn from_string(s: impl Into<String>) -> Self {
+        let s = s.into();
+        Body(BodyInner::Complete(Bytes::from_owner(s.into_bytes())))
+    }
+
+    pub async fn str_contents(&mut self) -> Result<&str, Error> {
+        let bs = self.contents().await?;
+        std::str::from_utf8(bs).context("decoding body contents as string")
+    }
+
+    pub fn from_bytes(b: impl Into<Bytes>) -> Self {
+        let b = b.into();
+        Body::from(http_body_util::Full::new(b))
+    }
+
+    #[cfg(feature = "json")]
+    pub fn from_json<T: serde::Serialize>(data: &T) -> Result<Self, serde_json::Error> {
+        Ok(Self::from_string(serde_json::to_string(data)?))
+    }
+
+    #[cfg(feature = "json")]
+    pub async fn json<T: for<'a> serde::Deserialize<'a>>(&mut self) -> Result<T, Error> {
+        let str = self.str_contents().await?;
+        serde_json::from_str(str).context("decoding body contents as json")
+    }
+
+    pub fn from_input_stream(r: crate::io::AsyncInputStream) -> Self {
+        use futures_lite::stream::StreamExt;
+        Body(BodyInner::Boxed(http_body_util::BodyExt::boxed_unsync(
+            http_body_util::StreamBody::new(r.into_stream().map(|res| {
+                res.map(|bytevec| Frame::data(Bytes::from_owner(bytevec)))
+                    .map_err(Into::into)
+            })),
+        )))
+    }
+}
+
+fn annotate_err<E>(_: E) -> Error {
+    unreachable!()
+}
+
+impl<B> From<B> for Body
+where
+    B: HttpBody + Send + 'static,
+    <B as HttpBody>::Data: Into<Bytes>,
+    <B as HttpBody>::Error: Into<Error>,
+{
+    fn from(http_body: B) -> Body {
+        use util::BodyExt;
+        Body(BodyInner::Boxed(
+            http_body
+                .map_frame(|f| f.map_data(Into::into))
+                .map_err(Into::into)
+                .boxed_unsync(),
+        ))
+    }
+}
+
+impl From<Incoming> for Body {
+    fn from(incoming: Incoming) -> Body {
+        Body(BodyInner::Incoming(incoming))
+    }
+}
+
+#[derive(Debug)]
+pub struct Incoming {
+    body: WasiIncomingBody,
+    size_hint: BodyHint,
+}
+
+impl Incoming {
+    pub(crate) fn new(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
+        Self { body, size_hint }
+    }
+    /// Use with `http_body::Body` trait
+    pub fn into_http_body(self) -> IncomingBody {
+        IncomingBody::new(self.body, self.size_hint)
+    }
+    pub fn into_body(self) -> Body {
+        self.into()
+    }
+    pub fn into_inner(self) -> WasiIncomingBody {
+        self.body
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum BodyHint {
+    ContentLength(u64),
+    Unknown,
+}
+
+impl BodyHint {
+    pub fn from_headers(headers: &HeaderMap) -> Result<Self, InvalidContentLength> {
+        if let Some(val) = headers.get(CONTENT_LENGTH) {
+            let len = std::str::from_utf8(val.as_ref())
+                .map_err(|_| InvalidContentLength)?
                 .parse::<u64>()
                 .map_err(|_| InvalidContentLength)?;
-            Ok(BodyKind::Fixed(content_length))
+            Ok(BodyHint::ContentLength(len))
         } else {
-            Ok(BodyKind::Chunked)
+            Ok(BodyHint::Unknown)
+        }
+    }
+    fn content_length(&self) -> Option<u64> {
+        match self {
+            BodyHint::ContentLength(l) => Some(*l),
+            _ => None,
         }
     }
 }
-
-/// A trait representing an HTTP body.
-#[doc(hidden)]
-pub trait Body: AsyncRead {
-    /// Returns the exact remaining length of the iterator, if known.
-    fn len(&self) -> Option<usize>;
-
-    /// Returns `true` if the body is known to be empty.
-    fn is_empty(&self) -> bool {
-        matches!(self.len(), Some(0))
-    }
-}
-
-/// Conversion into a `Body`.
-#[doc(hidden)]
-pub trait IntoBody {
-    /// What type of `Body` are we turning this into?
-    type IntoBody: Body;
-    /// Convert into `Body`.
-    fn into_body(self) -> Self::IntoBody;
-}
-impl<T> IntoBody for T
-where
-    T: Body,
-{
-    type IntoBody = T;
-    fn into_body(self) -> Self::IntoBody {
-        self
-    }
-}
-
-impl IntoBody for String {
-    type IntoBody = BoundedBody<Vec<u8>>;
-    fn into_body(self) -> Self::IntoBody {
-        BoundedBody(Cursor::new(self.into_bytes()))
-    }
-}
-
-impl IntoBody for &str {
-    type IntoBody = BoundedBody<Vec<u8>>;
-    fn into_body(self) -> Self::IntoBody {
-        BoundedBody(Cursor::new(self.to_owned().into_bytes()))
-    }
-}
-
-impl IntoBody for Vec<u8> {
-    type IntoBody = BoundedBody<Vec<u8>>;
-    fn into_body(self) -> Self::IntoBody {
-        BoundedBody(Cursor::new(self))
-    }
-}
-
-impl IntoBody for &[u8] {
-    type IntoBody = BoundedBody<Vec<u8>>;
-    fn into_body(self) -> Self::IntoBody {
-        BoundedBody(Cursor::new(self.to_owned()))
-    }
-}
-
-/// An HTTP body with a known length
 #[derive(Debug)]
-pub struct BoundedBody<T>(Cursor<T>);
+pub struct InvalidContentLength;
+impl fmt::Display for InvalidContentLength {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid Content-Length header")
+    }
+}
+impl std::error::Error for InvalidContentLength {}
 
-impl<T: AsRef<[u8]>> AsyncRead for BoundedBody<T> {
-    async fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
-        self.0.read(buf).await
-    }
-}
-impl<T: AsRef<[u8]>> Body for BoundedBody<T> {
-    fn len(&self) -> Option<usize> {
-        Some(self.0.get_ref().as_ref().len())
-    }
-}
-
-/// An HTTP body with an unknown length
-#[derive(Debug)]
-pub struct StreamedBody<S: AsyncRead>(S);
-
-impl<S: AsyncRead> StreamedBody<S> {
-    /// Wrap an `AsyncRead` impl in a type that provides a [`Body`] implementation.
-    pub fn new(s: S) -> Self {
-        Self(s)
-    }
-}
-impl<S: AsyncRead> AsyncRead for StreamedBody<S> {
-    async fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
-        self.0.read(buf).await
-    }
-}
-impl<S: AsyncRead> Body for StreamedBody<S> {
-    fn len(&self) -> Option<usize> {
-        None
-    }
-}
-
-impl Body for Empty {
-    fn len(&self) -> Option<usize> {
-        Some(0)
-    }
-}
-
-/// An incoming HTTP body
 #[derive(Debug)]
 pub struct IncomingBody {
-    kind: BodyKind,
-    // IMPORTANT: the order of these fields here matters. `body_stream` must
-    // be dropped before `incoming_body`.
-    body_stream: AsyncInputStream,
-    incoming_body: WasiIncomingBody,
+    state: Option<Pin<Box<IncomingBodyState>>>,
+    size_hint: BodyHint,
 }
 
 impl IncomingBody {
-    pub(crate) fn new(
-        kind: BodyKind,
-        body_stream: AsyncInputStream,
-        incoming_body: WasiIncomingBody,
-    ) -> Self {
+    fn new(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
         Self {
-            kind,
-            body_stream,
-            incoming_body,
+            state: Some(Box::pin(IncomingBodyState::Body {
+                read_state: BodyState {
+                    wait: None,
+                    subscription: None,
+                    stream: body
+                        .stream()
+                        .expect("wasi incoming-body stream should not yet be taken"),
+                },
+                body: Some(body),
+            })),
+            size_hint,
         }
     }
+}
 
-    /// Consume this `IncomingBody` and return the trailers, if present.
-    pub async fn finish(self) -> Result<Option<HeaderMap>, Error> {
-        // The stream is a child resource of the `IncomingBody`, so ensure that
-        // it's dropped first.
-        drop(self.body_stream);
-
-        let trailers = WasiIncomingBody::finish(self.incoming_body);
-
-        AsyncPollable::new(trailers.subscribe()).wait_for().await;
-
-        let trailers = trailers.get().unwrap().unwrap()?;
-
-        let trailers = match trailers {
-            None => None,
-            Some(trailers) => Some(header_map_from_wasi(trailers)?),
-        };
-
-        Ok(trailers)
-    }
-
-    /// Try to deserialize the incoming body as JSON. The optional
-    /// `json` feature is required.
-    ///
-    /// Fails whenever the response body is not in JSON format,
-    /// or it cannot be properly deserialized to target type `T`. For more
-    /// details please see [`serde_json::from_reader`].
-    ///
-    /// [`serde_json::from_reader`]: https://docs.serde.rs/serde_json/fn.from_reader.html
-    #[cfg(feature = "json")]
-    pub async fn json<T: DeserializeOwned>(&mut self) -> Result<T, Error> {
-        let buf = self.bytes().await?;
-        serde_json::from_slice(&buf).map_err(|e| ErrorVariant::Other(e.to_string()).into())
-    }
-
-    /// Get the full response body as `Vec<u8>`.
-    pub async fn bytes(&mut self) -> Result<Vec<u8>, Error> {
-        let mut buf = match self.kind {
-            BodyKind::Fixed(l) => {
-                if l > (usize::MAX as u64) {
-                    return Err(ErrorVariant::Other(
-                        "incoming body is too large to allocate and buffer in memory".to_string(),
-                    )
-                    .into());
-                } else {
-                    Vec::with_capacity(l as usize)
-                }
+impl HttpBody for IncomingBody {
+    type Data = Bytes;
+    type Error = Error;
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        loop {
+            let state = self.as_mut().state.take();
+            if state.is_none() {
+                return Poll::Ready(None);
             }
-            BodyKind::Chunked => Vec::with_capacity(4096),
-        };
-        self.read_to_end(&mut buf).await?;
-        Ok(buf)
+            let mut state = state.unwrap();
+            match state.as_mut().project() {
+                IBSProj::Body { read_state, body } => match read_state.poll_frame(cx) {
+                    Poll::Pending => {
+                        self.as_mut().state = Some(state);
+                        return Poll::Pending;
+                    }
+                    Poll::Ready(Some(r)) => {
+                        self.as_mut().state = Some(state);
+                        return Poll::Ready(Some(r));
+                    }
+                    Poll::Ready(None) => {
+                        // state contains children of the incoming-body. Must drop it
+                        // in order to finish
+                        let body = body.take().expect("finishing Body state");
+                        drop(state);
+                        let trailers_state = TrailersState::new(WasiIncomingBody::finish(body));
+                        self.as_mut().state =
+                            Some(Box::pin(IncomingBodyState::Trailers { trailers_state }));
+                        continue;
+                    }
+                },
+                IBSProj::Trailers { trailers_state } => match trailers_state.poll_frame(cx) {
+                    Poll::Pending => {
+                        self.as_mut().state = Some(state);
+                        return Poll::Pending;
+                    }
+                    Poll::Ready(r) => return Poll::Ready(r),
+                },
+            }
+        }
+    }
+    fn is_end_stream(&self) -> bool {
+        self.state.is_none()
+    }
+    fn size_hint(&self) -> SizeHint {
+        match self.size_hint {
+            BodyHint::ContentLength(l) => SizeHint::with_exact(l),
+            _ => Default::default(),
+        }
     }
 }
 
-impl AsyncRead for IncomingBody {
-    async fn read(&mut self, out_buf: &mut [u8]) -> crate::io::Result<usize> {
-        self.body_stream.read(out_buf).await
-    }
-
-    fn as_async_input_stream(&self) -> Option<&AsyncInputStream> {
-        Some(&self.body_stream)
+pin_project_lite::pin_project! {
+    #[project = IBSProj]
+    #[derive(Debug)]
+    enum IncomingBodyState {
+        Body {
+            #[pin]
+            read_state: BodyState,
+            // body is Some until we need to remove it from a projection
+            // during a state transition
+            body: Option<WasiIncomingBody>
+        },
+        Trailers {
+            #[pin]
+            trailers_state: TrailersState
+        },
     }
 }
 
-impl Body for IncomingBody {
-    fn len(&self) -> Option<usize> {
-        match self.kind {
-            BodyKind::Fixed(l) => {
-                if l > (usize::MAX as u64) {
-                    None
-                } else {
-                    Some(l as usize)
+#[derive(Debug)]
+struct BodyState {
+    wait: Option<Pin<Box<WaitFor>>>,
+    subscription: Option<AsyncPollable>,
+    stream: WasiInputStream,
+}
+
+const MAX_FRAME_SIZE: u64 = 64 * 1024;
+
+impl BodyState {
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Bytes>, Error>>> {
+        loop {
+            match self.stream.read(MAX_FRAME_SIZE) {
+                Ok(bs) if !bs.is_empty() => {
+                    return Poll::Ready(Some(Ok(Frame::data(Bytes::from(bs)))))
+                }
+                Err(StreamError::Closed) => return Poll::Ready(None),
+                Err(StreamError::LastOperationFailed(err)) => {
+                    return Poll::Ready(Some(Err(
+                        Error::msg(err.to_debug_string()).context("reading incoming body stream")
+                    )))
+                }
+                Ok(_empty) => {
+                    if self.subscription.is_none() {
+                        self.as_mut().subscription =
+                            Some(Reactor::current().schedule(self.stream.subscribe()));
+                    }
+                    if self.wait.is_none() {
+                        let wait = self.as_ref().subscription.as_ref().unwrap().wait_for();
+                        self.as_mut().wait = Some(Box::pin(wait));
+                    }
+                    let mut taken_wait = self.as_mut().wait.take().unwrap();
+                    match taken_wait.as_mut().poll(cx) {
+                        Poll::Pending => {
+                            self.as_mut().wait = Some(taken_wait);
+                            return Poll::Pending;
+                        }
+                        // Its possible that, after returning ready, the
+                        // stream does not actually provide any input. This
+                        // behavior should only occur once.
+                        Poll::Ready(()) => {
+                            continue;
+                        }
+                    }
                 }
             }
-            BodyKind::Chunked => None,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct InvalidContentLength;
-
-impl fmt::Display for InvalidContentLength {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        "incoming content-length should be a u64; violates HTTP/1.1".fmt(f)
-    }
+struct TrailersState {
+    wait: Option<Pin<Box<WaitFor>>>,
+    subscription: Option<AsyncPollable>,
+    future_trailers: FutureTrailers,
 }
 
-impl std::error::Error for InvalidContentLength {}
-
-impl From<InvalidContentLength> for Error {
-    fn from(e: InvalidContentLength) -> Self {
-        // TODO: What's the right error code here?
-        ErrorVariant::Other(e.to_string()).into()
-    }
-}
-
-/// The output stream for the body, implementing [`AsyncWrite`]. Call
-/// [`Responder::start_response`] or [`Client::start_request`] to obtain
-/// one. Once the body is complete, it must be declared finished, using
-/// [`Finished::finish`], [`Finished::fail`], [`Client::finish`], or
-/// [`Client::fail`].
-///
-/// [`Responder::start_response`]: crate::http::server::Responder::start_response
-/// [`Client::start_request`]: crate::http::client::Client::start_request
-/// [`Finished::finish`]: crate::http::server::Finished::finish
-/// [`Finished::fail`]: crate::http::server::Finished::fail
-/// [`Client::finish`]: crate::http::client::Client::finish
-/// [`Client::fail`]: crate::http::client::Client::fail
-#[must_use]
-pub struct OutgoingBody {
-    // IMPORTANT: the order of these fields here matters. `stream` must
-    // be dropped before `body`.
-    stream: AsyncOutputStream,
-    body: wasip2::http::types::OutgoingBody,
-    dontdrop: DontDropOutgoingBody,
-}
-
-impl OutgoingBody {
-    pub(crate) fn new(stream: AsyncOutputStream, body: wasip2::http::types::OutgoingBody) -> Self {
+impl TrailersState {
+    fn new(future_trailers: FutureTrailers) -> Self {
         Self {
-            stream,
-            body,
-            dontdrop: DontDropOutgoingBody,
+            wait: None,
+            subscription: None,
+            future_trailers,
         }
     }
 
-    pub(crate) fn consume(self) -> (AsyncOutputStream, wasip2::http::types::OutgoingBody) {
-        let Self {
-            stream,
-            body,
-            dontdrop,
-        } = self;
-
-        std::mem::forget(dontdrop);
-
-        (stream, body)
-    }
-
-    /// Return a reference to the underlying `AsyncOutputStream`.
-    ///
-    /// This usually isn't needed, as `OutgoingBody` implements `AsyncWrite`
-    /// too, however it is useful for code that expects to work with
-    /// `AsyncOutputStream` specifically.
-    pub fn stream(&mut self) -> &mut AsyncOutputStream {
-        &mut self.stream
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Bytes>, Error>>> {
+        loop {
+            if let Some(ready) = self.future_trailers.get() {
+                return match ready {
+                    Ok(Ok(Some(trailers))) => match header_map_from_wasi(trailers) {
+                        Ok(header_map) => Poll::Ready(Some(Ok(Frame::trailers(header_map)))),
+                        Err(e) => {
+                            Poll::Ready(Some(Err(e.context("decoding incoming body trailers"))))
+                        }
+                    },
+                    Ok(Ok(None)) => Poll::Ready(None),
+                    Ok(Err(e)) => Poll::Ready(Some(Err(
+                        Error::from(e).context("reading incoming body trailers")
+                    ))),
+                    Err(()) => unreachable!("future_trailers.get with some called at most once"),
+                };
+            }
+            if self.subscription.is_none() {
+                self.as_mut().subscription =
+                    Some(Reactor::current().schedule(self.future_trailers.subscribe()));
+            }
+            if self.wait.is_none() {
+                let wait = self.as_ref().subscription.as_ref().unwrap().wait_for();
+                self.as_mut().wait = Some(Box::pin(wait));
+            }
+            let mut taken_wait = self.as_mut().wait.take().unwrap();
+            match taken_wait.as_mut().poll(cx) {
+                Poll::Pending => {
+                    self.as_mut().wait = Some(taken_wait);
+                    return Poll::Pending;
+                }
+                // Its possible that, after returning ready, the
+                // future_trailers.get() does not actually provide any input. This
+                // behavior should only occur once.
+                Poll::Ready(()) => {
+                    continue;
+                }
+            }
+        }
     }
 }
-
-impl AsyncWrite for OutgoingBody {
-    async fn write(&mut self, buf: &[u8]) -> crate::io::Result<usize> {
-        self.stream.write(buf).await
-    }
-
-    async fn flush(&mut self) -> crate::io::Result<()> {
-        self.stream.flush().await
-    }
-
-    fn as_async_output_stream(&self) -> Option<&AsyncOutputStream> {
-        Some(&self.stream)
-    }
-}
-
-/// A utility to ensure that `OutgoingBody` is either finished or failed, and
-/// not implicitly dropped.
-struct DontDropOutgoingBody;
-
-impl Drop for DontDropOutgoingBody {
-    fn drop(&mut self) {
-        unreachable!("`OutgoingBody::drop` called; `OutgoingBody`s should be consumed with `finish` or `fail`.");
-    }
-}
-
-/// A placeholder for use as the type parameter to [`Request`] and [`Response`]
-/// to indicate that the body has not yet started. This is used with
-/// [`Client::start_request`] and [`Responder::start_response`], which have
-/// `Requeset<BodyForthcoming>` and `Response<BodyForthcoming>` arguments,
-/// respectively.
-///
-/// To instead start the response and obtain the output stream for the body,
-/// use [`Responder::respond`].
-/// To instead send a request or response with an input stream for the body,
-/// use [`Client::send`] or [`Responder::respond`].
-///
-/// [`Request`]: crate::http::Request
-/// [`Response`]: crate::http::Response
-/// [`Client::start_request`]: crate::http::Client::start_request
-/// [`Responder::start_response`]: crate::http::server::Responder::start_response
-/// [`Client::send`]: crate::http::Client::send
-/// [`Responder::respond`]: crate::http::server::Responder::respond
-pub struct BodyForthcoming;

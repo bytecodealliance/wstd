@@ -1,31 +1,36 @@
-use wstd::http::body::{BodyForthcoming, IncomingBody, OutgoingBody};
-use wstd::http::server::{Finished, Responder};
-use wstd::http::{IntoBody, Request, Response, StatusCode};
-use wstd::io::{copy, empty, AsyncWrite};
+use anyhow::{Context, Result};
+use futures_lite::stream::once_future;
+use http_body_util::{BodyExt, StreamBody};
+use wstd::http::body::{Body, Bytes, Frame, Incoming};
+use wstd::http::{Error, HeaderMap, Request, Response, StatusCode};
 use wstd::time::{Duration, Instant};
 
 #[wstd::http_server]
-async fn main(request: Request<IncomingBody>, responder: Responder) -> Finished {
-    match request.uri().path_and_query().unwrap().as_str() {
-        "/wait" => http_wait(request, responder).await,
-        "/echo" => http_echo(request, responder).await,
-        "/echo-headers" => http_echo_headers(request, responder).await,
-        "/echo-trailers" => http_echo_trailers(request, responder).await,
-        "/fail" => http_fail(request, responder).await,
-        "/bigfail" => http_bigfail(request, responder).await,
-        "/" => http_home(request, responder).await,
-        _ => http_not_found(request, responder).await,
+async fn main(request: Request<Incoming>) -> Result<Response<Body>, Error> {
+    let path = request.uri().path_and_query().unwrap().as_str();
+    println!("serving {path}");
+    match path {
+        "/" => http_home(request).await,
+        "/wait-response" => http_wait_response(request).await,
+        "/wait-body" => http_wait_body(request).await,
+        "/echo" => http_echo(request).await,
+        "/echo-headers" => http_echo_headers(request).await,
+        "/echo-trailers" => http_echo_trailers(request).await,
+        "/response-status" => http_response_status(request).await,
+        "/response-fail" => http_response_fail(request).await,
+        "/response-body-fail" => http_body_fail(request).await,
+        _ => http_not_found(request).await,
     }
 }
 
-async fn http_home(_request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn http_home(_request: Request<Incoming>) -> Result<Response<Body>> {
     // To send a single string as the response body, use `Responder::respond`.
-    responder
-        .respond(Response::new("Hello, wasi:http/proxy world!\n".into_body()))
-        .await
+    Ok(Response::new(
+        "Hello, wasi:http/proxy world!\n".to_owned().into(),
+    ))
 }
 
-async fn http_wait(_request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn http_wait_response(_request: Request<Incoming>) -> Result<Response<Body>> {
     // Get the time now
     let now = Instant::now();
 
@@ -35,60 +40,85 @@ async fn http_wait(_request: Request<IncomingBody>, responder: Responder) -> Fin
     // Compute how long we slept for.
     let elapsed = Instant::now().duration_since(now).as_millis();
 
-    // To stream data to the response body, use `Responder::start_response`.
-    let mut body = responder.start_response(Response::new(BodyForthcoming));
-    let result = body
-        .write_all(format!("slept for {elapsed} millis\n").as_bytes())
-        .await;
-    Finished::finish(body, result, None)
+    Ok(Response::new(
+        format!("slept for {elapsed} millis\n").into(),
+    ))
 }
 
-async fn http_echo(mut request: Request<IncomingBody>, responder: Responder) -> Finished {
-    // Stream data from the request body to the response body.
-    let mut body = responder.start_response(Response::new(BodyForthcoming));
-    let result = copy(request.body_mut(), &mut body).await;
-    Finished::finish(body, result, None)
+async fn http_wait_body(_request: Request<Incoming>) -> Result<Response<Body>> {
+    // Get the time now
+    let now = Instant::now();
+
+    let body = StreamBody::new(once_future(async move {
+        // Sleep for one second.
+        wstd::task::sleep(Duration::from_secs(1)).await;
+
+        // Compute how long we slept for.
+        let elapsed = Instant::now().duration_since(now).as_millis();
+        anyhow::Ok(Frame::data(Bytes::from(format!(
+            "slept for {elapsed} millis\n"
+        ))))
+    }));
+
+    Ok(Response::new(body.into()))
 }
 
-async fn http_fail(_request: Request<IncomingBody>, responder: Responder) -> Finished {
-    let body = responder.start_response(Response::new(BodyForthcoming));
-    Finished::fail(body)
+async fn http_echo(request: Request<Incoming>) -> Result<Response<Body>> {
+    let (_parts, body) = request.into_parts();
+    Ok(Response::new(body.into()))
 }
 
-async fn http_bigfail(_request: Request<IncomingBody>, responder: Responder) -> Finished {
-    async fn write_body(body: &mut OutgoingBody) -> wstd::io::Result<()> {
-        for _ in 0..0x10 {
-            body.write_all("big big big big\n".as_bytes()).await?;
-        }
-        body.flush().await?;
-        Ok(())
-    }
-
-    let mut body = responder.start_response(Response::new(BodyForthcoming));
-    let _ = write_body(&mut body).await;
-    Finished::fail(body)
-}
-
-async fn http_echo_headers(request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn http_echo_headers(request: Request<Incoming>) -> Result<Response<Body>> {
     let mut response = Response::builder();
     *response.headers_mut().unwrap() = request.into_parts().0.headers;
-    let response = response.body(empty()).unwrap();
-    responder.respond(response).await
+    Ok(response.body("".to_owned().into())?)
 }
 
-async fn http_echo_trailers(request: Request<IncomingBody>, responder: Responder) -> Finished {
-    let body = responder.start_response(Response::new(BodyForthcoming));
-    let (trailers, result) = match request.into_body().finish().await {
-        Ok(trailers) => (trailers, Ok(())),
-        Err(err) => (Default::default(), Err(std::io::Error::other(err))),
+async fn http_echo_trailers(request: Request<Incoming>) -> Result<Response<Body>> {
+    let collected = request.into_body().into_http_body().collect().await?;
+    let trailers = collected.trailers().cloned().unwrap_or_else(|| {
+        let mut trailers = HeaderMap::new();
+        trailers.insert("x-no-trailers", "1".parse().unwrap());
+        trailers
+    });
+
+    let body = StreamBody::new(once_future(async move {
+        anyhow::Ok(Frame::<Bytes>::trailers(trailers))
+    }));
+    Ok(Response::new(body.into()))
+}
+
+async fn http_response_status(request: Request<Incoming>) -> Result<Response<Body>> {
+    let status = if let Some(header_val) = request.headers().get("x-response-status") {
+        header_val
+            .to_str()
+            .context("contents of x-response-status")?
+            .parse::<u16>()
+            .context("u16 value from x-response-status")?
+    } else {
+        500
     };
-    Finished::finish(body, result, trailers)
+    Ok(Response::builder()
+        .status(status)
+        .body(String::new().into())?)
 }
 
-async fn http_not_found(_request: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn http_response_fail(_request: Request<Incoming>) -> Result<Response<Body>> {
+    Err(anyhow::anyhow!("error creating response"))
+}
+
+async fn http_body_fail(_request: Request<Incoming>) -> Result<Response<Body>> {
+    let body = StreamBody::new(once_future(async move {
+        Err::<Frame<Bytes>, _>(anyhow::anyhow!("error creating body"))
+    }));
+
+    Ok(Response::new(body.into()))
+}
+
+async fn http_not_found(_request: Request<Incoming>) -> Result<Response<Body>> {
     let response = Response::builder()
         .status(StatusCode::NOT_FOUND)
-        .body(empty())
+        .body(Body::empty())
         .unwrap();
-    responder.respond(response).await
+    Ok(response)
 }

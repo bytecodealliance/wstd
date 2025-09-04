@@ -24,8 +24,14 @@ impl Stdin {
     pub fn is_terminal(&self) -> bool {
         LazyCell::force(&self.terminput).is_some()
     }
+
+    /// Get the `AsyncInputStream` used to implement `Stdin`
+    pub fn into_inner(self) -> AsyncInputStream {
+        self.stream
+    }
 }
 
+#[async_trait::async_trait(?Send)]
 impl AsyncRead for Stdin {
     #[inline]
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
@@ -64,8 +70,14 @@ impl Stdout {
     pub fn is_terminal(&self) -> bool {
         LazyCell::force(&self.termoutput).is_some()
     }
+
+    /// Get the `AsyncOutputStream` used to implement `Stdout`
+    pub fn into_inner(self) -> AsyncOutputStream {
+        self.stream
+    }
 }
 
+#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Stdout {
     #[inline]
     async fn write(&mut self, buf: &[u8]) -> Result<usize> {
@@ -109,8 +121,14 @@ impl Stderr {
     pub fn is_terminal(&self) -> bool {
         LazyCell::force(&self.termoutput).is_some()
     }
+
+    /// Get the `AsyncOutputStream` used to implement `Stderr`
+    pub fn into_inner(self) -> AsyncOutputStream {
+        self.stream
+    }
 }
 
+#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Stderr {
     #[inline]
     async fn write(&mut self, buf: &[u8]) -> Result<usize> {
