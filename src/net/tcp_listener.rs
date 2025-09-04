@@ -33,15 +33,8 @@ impl TcpListener {
             wasi::sockets::tcp_create_socket::create_tcp_socket(family).map_err(to_io_err)?;
         let network = wasi::sockets::instance_network::instance_network();
 
-        let local_address = match addr {
-            SocketAddr::V4(addr) => {
-                let ip = addr.ip().octets();
-                let address = (ip[0], ip[1], ip[2], ip[3]);
-                let port = addr.port();
-                IpSocketAddress::Ipv4(Ipv4SocketAddress { port, address })
-            }
-            SocketAddr::V6(_) => todo!("IPv6 not yet supported in `wstd::net::TcpListener`"),
-        };
+        let local_address = sockaddr_to_wasi(addr);
+
         socket
             .start_bind(&network, local_address)
             .map_err(to_io_err)?;
@@ -56,10 +49,11 @@ impl TcpListener {
     }
 
     /// Returns the local socket address of this listener.
-    // TODO: make this return an actual socket addr
-    pub fn local_addr(&self) -> io::Result<String> {
-        let addr = self.socket.local_address().map_err(to_io_err)?;
-        Ok(format!("{addr:?}"))
+    pub fn local_addr(&self) -> io::Result<std::net::SocketAddr> {
+        self.socket
+            .local_address()
+            .map_err(to_io_err)
+            .map(sockaddr_from_wasi)
     }
 
     /// Returns an iterator over the connections being received on this listener.
@@ -103,5 +97,53 @@ pub(super) fn to_io_err(err: ErrorCode) -> io::Error {
         wasi::sockets::network::ErrorCode::ConnectionAborted => ErrorKind::ConnectionAborted.into(),
         wasi::sockets::network::ErrorCode::ConcurrencyConflict => ErrorKind::AlreadyExists.into(),
         _ => ErrorKind::Other.into(),
+    }
+}
+
+fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
+    use wasi::sockets::network::Ipv6SocketAddress;
+    match addr {
+        IpSocketAddress::Ipv4(Ipv4SocketAddress { address, port }) => {
+            std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
+                std::net::Ipv4Addr::new(address.0, address.1, address.2, address.3),
+                port,
+            ))
+        }
+        IpSocketAddress::Ipv6(Ipv6SocketAddress {
+            address,
+            port,
+            flow_info,
+            scope_id,
+        }) => std::net::SocketAddr::V6(std::net::SocketAddrV6::new(
+            std::net::Ipv6Addr::new(
+                address.0, address.1, address.2, address.3, address.4, address.5, address.6,
+                address.7,
+            ),
+            port,
+            flow_info,
+            scope_id,
+        )),
+    }
+}
+
+fn sockaddr_to_wasi(addr: std::net::SocketAddr) -> IpSocketAddress {
+    use wasi::sockets::network::Ipv6SocketAddress;
+    match addr {
+        std::net::SocketAddr::V4(addr) => {
+            let ip = addr.ip().octets();
+            IpSocketAddress::Ipv4(Ipv4SocketAddress {
+                address: (ip[0], ip[1], ip[2], ip[3]),
+                port: addr.port(),
+            })
+        }
+        std::net::SocketAddr::V6(addr) => {
+            let ip = addr.ip().segments();
+            IpSocketAddress::Ipv6(Ipv6SocketAddress {
+                address: (ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7]),
+                port: addr.port(),
+                flow_info: addr.flowinfo(),
+                scope_id: addr.scope_id(),
+            })
+        }
     }
 }
