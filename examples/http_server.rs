@@ -1,11 +1,11 @@
 use anyhow::Result;
 use wstd::http::body::{BodyForthcoming, BoxBody, IncomingBody, OutgoingBody};
-use wstd::http::{Body, IntoBody, Request, Response, StatusCode};
+use wstd::http::{error::ErrorCode, Body, IntoBody, Request, Response, StatusCode};
 use wstd::io::{copy, empty, AsyncWrite};
 use wstd::time::{Duration, Instant};
 
 #[wstd::http_server]
-async fn main(request: Request<IncomingBody>) -> Result<Response<BoxBody>> {
+async fn main(request: Request<IncomingBody>) -> Result<Response<BoxBody>, ErrorCode> {
     match request.uri().path_and_query().unwrap().as_str() {
         /*
         "/wait" => http_wait(request, responder).await,
@@ -18,6 +18,10 @@ async fn main(request: Request<IncomingBody>) -> Result<Response<BoxBody>> {
         "/" => http_home(request).await,
         _ => http_not_found(request).await,
     }
+    .map_err(|e| match e.downcast::<ErrorCode>() {
+        Ok(e) => e,
+        Err(e) => ErrorCode::InternalError(Some(format!("{e:?}"))),
+    })
 }
 
 async fn http_home(_request: Request<IncomingBody>) -> Result<Response<BoxBody>> {

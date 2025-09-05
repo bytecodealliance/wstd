@@ -12,7 +12,7 @@ pub struct Error {
 
 pub use http::header::{InvalidHeaderName, InvalidHeaderValue};
 pub use http::method::InvalidMethod;
-pub use wasi::http::types::{ErrorCode as WasiHttpErrorCode, HeaderError as WasiHttpHeaderError};
+pub use wasi::http::types::{ErrorCode, HeaderError};
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -73,8 +73,8 @@ impl From<ErrorVariant> for Error {
     }
 }
 
-impl From<WasiHttpErrorCode> for Error {
-    fn from(e: WasiHttpErrorCode) -> Error {
+impl From<ErrorCode> for Error {
+    fn from(e: ErrorCode) -> Error {
         ErrorVariant::WasiHttp(e).into()
     }
 }
@@ -114,8 +114,8 @@ impl From<std::io::Error> for Error {
 
 #[derive(Debug)]
 pub enum ErrorVariant {
-    WasiHttp(WasiHttpErrorCode),
-    WasiHeader(WasiHttpHeaderError),
+    WasiHttp(ErrorCode),
+    WasiHeader(HeaderError),
     HeaderName(InvalidHeaderName),
     HeaderValue(InvalidHeaderValue),
     Method(InvalidMethod),

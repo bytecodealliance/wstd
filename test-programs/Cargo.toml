@@ -7,6 +7,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+anyhow.workspace = true
 futures-lite.workspace = true
 serde_json.workspace = true
 wstd.workspace = true

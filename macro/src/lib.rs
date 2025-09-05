@@ -135,15 +135,15 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
                 }
 
                 let responder = ::wstd::http::server::Responder::new(response_out);
-                match ::wstd::http::request::try_from_incoming(request) {
-                    Ok(request) => ::wstd::runtime::block_on(async move {
-                        match __run(request).await {
-                            Ok(response) => responder.respond(response),
+                ::wstd::runtime::block_on(async move {
+                    match ::wstd::http::request::try_from_incoming(request) {
+                        Ok(request) => match __run(request).await {
+                            Ok(response) => responder.respond(response).await,
                             Err(err) => responder.fail(err),
                         }
-                    }),
-                    Err(err) => responder.fail(err),
-                }
+                        Err(err) => responder.fail(err),
+                    }
+                })
             }
         }
 

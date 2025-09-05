@@ -1,6 +1,6 @@
 use super::{
     body::{BodyKind, IncomingBody},
-    error::WasiHttpErrorCode,
+    error::ErrorCode,
     fields::{header_map_from_wasi, header_map_to_wasi},
     method::{from_wasi_method, to_wasi_method},
     scheme::{from_wasi_scheme, to_wasi_scheme},
@@ -97,15 +97,13 @@ pub(crate) fn try_into_outgoing<T>(request: Request<T>) -> Result<(OutgoingReque
 
 /// This is used by the `http_server` macro.
 #[doc(hidden)]
-pub fn try_from_incoming(
-    incoming: IncomingRequest,
-) -> Result<Request<IncomingBody>, WasiHttpErrorCode> {
+pub fn try_from_incoming(incoming: IncomingRequest) -> Result<Request<IncomingBody>, ErrorCode> {
     // TODO: What's the right error code to use for invalid headers?
     let headers: HeaderMap = header_map_from_wasi(incoming.headers())
-        .map_err(|e| WasiHttpErrorCode::InternalError(Some(e.to_string())))?;
+        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
 
-    let method = from_wasi_method(incoming.method())
-        .map_err(|_| WasiHttpErrorCode::HttpRequestMethodInvalid)?;
+    let method =
+        from_wasi_method(incoming.method()).map_err(|_| ErrorCode::HttpRequestMethodInvalid)?;
     let scheme = incoming.scheme().map(|scheme| {
         from_wasi_scheme(scheme).expect("TODO: what shall we do with an invalid uri here?")
     });
@@ -120,7 +118,7 @@ pub fn try_from_incoming(
 
     // TODO: What's the right error code to use for invalid headers?
     let kind = BodyKind::from_headers(&headers)
-        .map_err(|e| WasiHttpErrorCode::InternalError(Some(e.to_string())))?;
+        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
     // `body_stream` is a child of `incoming_body` which means we cannot
     // drop the parent before we drop the child
     let incoming_body = incoming
@@ -146,7 +144,7 @@ pub fn try_from_incoming(
     // TODO: What's the right error code to use for an invalid uri?
     let uri = uri
         .build()
-        .map_err(|e| WasiHttpErrorCode::InternalError(Some(e.to_string())))?;
+        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
 
     let mut request = Request::builder().method(method).uri(uri);
     if let Some(headers_mut) = request.headers_mut() {
@@ -155,5 +153,5 @@ pub fn try_from_incoming(
     // TODO: What's the right error code to use for an invalid request?
     request
         .body(body)
-        .map_err(|e| WasiHttpErrorCode::InternalError(Some(e.to_string())))
+        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))
 }

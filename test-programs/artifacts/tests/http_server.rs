@@ -32,11 +32,11 @@ fn http_server() -> Result<()> {
 
     match ureq::get("http://127.0.0.1:8081/fail").call() {
         Ok(body) => {
-            unreachable!("unexpected success from /fail: {:?}", body);
+            panic!("unexpected success from /fail: {:?}", body);
         }
         Err(ureq::Error::Transport(_transport)) => {}
         Err(other) => {
-            unreachable!("unexpected error: {:?}", other);
+            panic!("unexpected error: {:?}", other);
         }
     }
 

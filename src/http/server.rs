@@ -22,7 +22,7 @@
 
 use super::{
     body::{BodyForthcoming, OutgoingBody},
-    error::WasiHttpErrorCode,
+    error::ErrorCode,
     fields::header_map_to_wasi,
     Body, HeaderMap, Response,
 };
@@ -31,6 +31,7 @@ use http::header::CONTENT_LENGTH;
 use wasi::exports::http::incoming_handler::ResponseOutparam;
 use wasi::http::types::OutgoingResponse;
 
+/// TK REWRITE THESE DOCS
 /// This is passed into the [`http_server`] `main` function and holds the state
 /// needed for a handler to produce a response, or fail. There are two ways to
 /// respond, with [`Responder::start_response`] to stream the body in, or
@@ -92,14 +93,14 @@ impl Responder {
     /// # use wstd::http::{body::{IncomingBody, BodyForthcoming}, IntoBody, Response, Request};
     /// # use wstd::http::server::{Finished, Responder};
     /// #
-    /// # async fn example(responder: Responder) -> Finished {
+    /// # async fn example(responder: Responder) {
     ///     responder
     ///         .respond(Response::new("Hello!\n".into_body()))
     ///         .await
     /// # }
     /// # fn main() {}
     /// ```
-    pub async fn respond<B: Body>(self, response: Response<B>) -> Finished {
+    pub async fn respond<B: Body>(self, response: Response<B>) {
         let headers = response.headers();
         let status = response.status().as_u16();
 
@@ -128,11 +129,12 @@ impl Responder {
         // Tell WASI to start the show.
         ResponseOutparam::set(self.outparam, Ok(wasi_response));
 
+        // TODO: Move this out to BodyForthcoming!
         let mut outgoing_body = OutgoingBody::new(AsyncOutputStream::new(wasi_stream), wasi_body);
 
         let result = copy(&mut body, &mut outgoing_body).await;
         let trailers = None;
-        Finished::finish(outgoing_body, result, trailers)
+        Finished::finish(outgoing_body, result, trailers);
     }
 
     /// This is used by the `http_server` macro.
@@ -143,9 +145,8 @@ impl Responder {
 
     /// This is used by the `http_server` macro.
     #[doc(hidden)]
-    pub fn fail(self, err: WasiHttpErrorCode) -> Finished {
-        ResponseOutparam::set(self.outparam, Err(err));
-        Finished(())
+    pub fn fail(self, err: ErrorCode) {
+        ResponseOutparam::set(self.outparam, Err(err))
     }
 }
 
