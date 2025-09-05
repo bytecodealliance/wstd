@@ -63,7 +63,7 @@ authors = [
 
 [workspace.dependencies]
 anyhow = "1"
-cargo_metadata = "0.18.1"
+cargo_metadata = "0.22"
 clap = { version = "4.5.26", features = ["derive"] }
 futures-core = "0.3.19"
 futures-lite = "1.12.0"

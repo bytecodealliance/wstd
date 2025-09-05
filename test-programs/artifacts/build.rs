@@ -1,3 +1,4 @@
+use cargo_metadata::TargetKind;
 use heck::ToShoutySnakeCase;
 use std::env::var_os;
 use std::path::PathBuf;
@@ -12,7 +13,7 @@ fn main() {
     let test_programs_meta = meta
         .packages
         .iter()
-        .find(|p| p.name == "test-programs")
+        .find(|p| *p.name == "test-programs")
         .expect("test-programs is in cargo metadata");
     let test_programs_root = test_programs_meta.manifest_path.parent().unwrap();
     println!(
@@ -37,7 +38,7 @@ fn main() {
     for binary in test_programs_meta
         .targets
         .iter()
-        .filter(|t| t.kind == ["bin"])
+        .filter(|t| t.kind == [TargetKind::Bin])
     {
         let component_path = out_dir
             .join("wasm32-wasip2")
