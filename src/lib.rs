@@ -1,5 +1,6 @@
 #![allow(async_fn_in_trait)]
 #![warn(future_incompatible, unreachable_pub)]
+#![deny(unsafe_code)]
 //#![deny(missing_debug_implementations)]
 //#![warn(missing_docs)]
 //#![forbid(rustdoc::missing_doc_code_examples)]
@@ -54,26 +55,15 @@
 //! These are unique capabilities provided by WASI 0.2, and because this library
 //! is specific to that are exposed from here.
 
-// We need unsafe code in the runtime.
-pub mod runtime;
-
-// All other mods do not require unsafe.
-#[forbid(unsafe_code)]
 pub mod future;
-#[forbid(unsafe_code)]
 #[macro_use]
 pub mod http;
-#[forbid(unsafe_code)]
 pub mod io;
-#[forbid(unsafe_code)]
 pub mod iter;
-#[forbid(unsafe_code)]
 pub mod net;
-#[forbid(unsafe_code)]
 pub mod rand;
-#[forbid(unsafe_code)]
+pub mod runtime;
 pub mod task;
-#[forbid(unsafe_code)]
 pub mod time;
 
 pub use wstd_macro::attr_macro_http_server as http_server;

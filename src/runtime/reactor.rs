@@ -271,6 +271,7 @@ impl Reactor {
         // the schedule function is not Send or Sync, because Runnable is not
         // Send or Sync. This is safe because wasm32-wasip2 is always
         // single-threaded.
+        #[allow(unsafe_code)]
         let (runnable, task) = unsafe { async_task::spawn_unchecked(fut, schedule) };
         self.inner.ready_list.borrow_mut().push_back(runnable);
         task
