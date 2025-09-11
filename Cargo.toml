@@ -47,7 +47,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.5.4"
+version = "0.5.5"
 edition = "2021"
 license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/bytecodealliance/wstd"
@@ -85,7 +85,7 @@ test-programs-artifacts = { path = "test-programs/artifacts" }
 ureq = { version = "2.12.1", default-features = false }
 wasi = "0.14.0"
 wstd = { path = "." }
-wstd-macro = { path = "macro", version = "=0.5.4" }
+wstd-macro = { path = "macro", version = "=0.5.5" }
 
 [package.metadata.docs.rs]
 all-features = true
