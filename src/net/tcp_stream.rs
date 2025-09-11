@@ -1,4 +1,4 @@
-use wasi::{
+use wasip2::{
     io::streams::{InputStream, OutputStream},
     sockets::tcp::TcpSocket,
 };
@@ -36,7 +36,9 @@ impl TcpStream {
 
 impl Drop for TcpStream {
     fn drop(&mut self) {
-        let _ = self.socket.shutdown(wasi::sockets::tcp::ShutdownType::Both);
+        let _ = self
+            .socket
+            .shutdown(wasip2::sockets::tcp::ShutdownType::Both);
     }
 }
 
@@ -104,7 +106,7 @@ impl<'a> Drop for ReadHalf<'a> {
         let _ = self
             .0
             .socket
-            .shutdown(wasi::sockets::tcp::ShutdownType::Receive);
+            .shutdown(wasip2::sockets::tcp::ShutdownType::Receive);
     }
 }
 
@@ -128,6 +130,6 @@ impl<'a> Drop for WriteHalf<'a> {
         let _ = self
             .0
             .socket
-            .shutdown(wasi::sockets::tcp::ShutdownType::Send);
+            .shutdown(wasip2::sockets::tcp::ShutdownType::Send);
     }
 }

@@ -22,7 +22,7 @@ http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
 slab.workspace = true
-wasi.workspace = true
+wasip2.workspace = true
 wstd-macro.workspace = true
 
 # optional
@@ -83,7 +83,7 @@ test-log = { version = "0.2", features = ["trace"] }
 test-programs = { path = "test-programs" }
 test-programs-artifacts = { path = "test-programs/artifacts" }
 ureq = { version = "2.12.1", default-features = false }
-wasi = "0.14.0"
+wasip2 = "1.0"
 wstd = { path = "." }
 wstd-macro = { path = "macro", version = "=0.5.5" }
 

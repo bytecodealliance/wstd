@@ -1,7 +1,7 @@
 use super::{AsyncPollable, AsyncRead, AsyncWrite};
 use std::cell::OnceCell;
 use std::io::Result;
-use wasi::io::streams::{InputStream, OutputStream, StreamError};
+use wasip2::io::streams::{InputStream, OutputStream, StreamError};
 
 /// A wrapper for WASI's `InputStream` resource that provides implementations of `AsyncRead` and
 /// `AsyncPollable`.

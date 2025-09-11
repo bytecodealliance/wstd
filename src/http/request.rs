@@ -7,8 +7,8 @@ use super::{
     Authority, Error, HeaderMap, PathAndQuery, Uri,
 };
 use crate::io::AsyncInputStream;
-use wasi::http::outgoing_handler::OutgoingRequest;
-use wasi::http::types::IncomingRequest;
+use wasip2::http::outgoing_handler::OutgoingRequest;
+use wasip2::http::types::IncomingRequest;
 
 pub use http::request::{Builder, Request};
 
@@ -71,7 +71,7 @@ pub(crate) fn try_into_outgoing<T>(request: Request<T>) -> Result<(OutgoingReque
         .uri
         .scheme()
         .map(to_wasi_scheme)
-        .unwrap_or(wasi::http::types::Scheme::Https);
+        .unwrap_or(wasip2::http::types::Scheme::Https);
     wasi_req
         .set_scheme(Some(&scheme))
         .map_err(|()| Error::other(format!("scheme rejected by wasi-http: {scheme:?}")))?;

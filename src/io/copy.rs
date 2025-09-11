@@ -1,5 +1,5 @@
 use crate::io::{AsyncRead, AsyncWrite, Error};
-use wasi::io::streams::StreamError;
+use wasip2::io::streams::StreamError;
 
 /// Copy bytes from a reader to a writer.
 pub async fn copy<R, W>(mut reader: R, mut writer: W) -> crate::io::Result<()>

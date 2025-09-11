@@ -1,6 +1,6 @@
 //! Random number generation.
 
-use wasi::random;
+use wasip2::random;
 
 /// Fill the slice with cryptographically secure random bytes.
 pub fn get_random_bytes(buf: &mut [u8]) {

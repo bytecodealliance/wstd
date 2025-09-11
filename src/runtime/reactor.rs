@@ -8,7 +8,7 @@ use core::task::{Context, Poll, Waker};
 use slab::Slab;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
-use wasi::io::poll::Pollable;
+use wasip2::io::poll::Pollable;
 
 /// A key for a `Pollable`, which is an index into the `Slab<Pollable>` in `Reactor`.
 #[repr(transparent)]
@@ -143,9 +143,9 @@ impl Reactor {
             debug_assert_ne!(
                 targets.len(),
                 0,
-                "Attempting to block on an empty list of pollables - without any pending work, no progress can be made and wasi::io::poll::poll will trap"
+                "Attempting to block on an empty list of pollables - without any pending work, no progress can be made and wasip2::io::poll::poll will trap"
             );
-            wasi::io::poll::poll(targets)
+            wasip2::io::poll::poll(targets)
 
         })
     }
@@ -161,7 +161,7 @@ impl Reactor {
         // Lazily create a pollable which always resolves to ready.
         use std::sync::LazyLock;
         static READY_POLLABLE: LazyLock<Pollable> =
-            LazyLock::new(|| wasi::clocks::monotonic_clock::subscribe_duration(0));
+            LazyLock::new(|| wasip2::clocks::monotonic_clock::subscribe_duration(0));
 
         self.check_pollables(|targets| {
             // Create a new set of targets, with the addition of the ready
@@ -173,7 +173,7 @@ impl Reactor {
 
             // Poll is now guaranteed to return immediately, because at least
             // one member is ready:
-            let mut ready_list = wasi::io::poll::poll(&new_targets);
+            let mut ready_list = wasip2::io::poll::poll(&new_targets);
 
             // Erase our extra ready pollable from the ready list:
             ready_list.retain(|e| *e != ready_index as u32);
@@ -295,7 +295,7 @@ mod test {
     fn subscribe_no_duration() {
         crate::runtime::block_on(async {
             let reactor = Reactor::current();
-            let pollable = wasi::clocks::monotonic_clock::subscribe_duration(0);
+            let pollable = wasip2::clocks::monotonic_clock::subscribe_duration(0);
             let sched = reactor.schedule(pollable);
             sched.wait_for().await;
         })
@@ -305,7 +305,7 @@ mod test {
     fn subscribe_some_duration() {
         crate::runtime::block_on(async {
             let reactor = Reactor::current();
-            let pollable = wasi::clocks::monotonic_clock::subscribe_duration(10_000_000);
+            let pollable = wasip2::clocks::monotonic_clock::subscribe_duration(10_000_000);
             let sched = reactor.schedule(pollable);
             sched.wait_for().await;
         })
@@ -318,8 +318,8 @@ mod test {
     fn subscribe_multiple_durations() {
         crate::runtime::block_on(async {
             let reactor = Reactor::current();
-            let now = wasi::clocks::monotonic_clock::subscribe_duration(0);
-            let soon = wasi::clocks::monotonic_clock::subscribe_duration(10_000_000);
+            let now = wasip2::clocks::monotonic_clock::subscribe_duration(0);
+            let soon = wasip2::clocks::monotonic_clock::subscribe_duration(10_000_000);
             let now = reactor.schedule(now);
             let soon = reactor.schedule(soon);
             soon.wait_for().await;
@@ -333,9 +333,9 @@ mod test {
     fn subscribe_multiple_durations_zipped() {
         crate::runtime::block_on(async {
             let reactor = Reactor::current();
-            let start = wasi::clocks::monotonic_clock::now();
-            let soon = wasi::clocks::monotonic_clock::subscribe_duration(10_000_000);
-            let later = wasi::clocks::monotonic_clock::subscribe_duration(40_000_000);
+            let start = wasip2::clocks::monotonic_clock::now();
+            let soon = wasip2::clocks::monotonic_clock::subscribe_duration(10_000_000);
+            let later = wasip2::clocks::monotonic_clock::subscribe_duration(40_000_000);
             let soon = reactor.schedule(soon);
             let later = reactor.schedule(later);
 
@@ -344,14 +344,14 @@ mod test {
                     soon.wait_for().await;
                     println!(
                         "*** subscribe_duration(soon) ready ({})",
-                        wasi::clocks::monotonic_clock::now() - start
+                        wasip2::clocks::monotonic_clock::now() - start
                     );
                 },
                 async move {
                     later.wait_for().await;
                     println!(
                         "*** subscribe_duration(later) ready ({})",
-                        wasi::clocks::monotonic_clock::now() - start
+                        wasip2::clocks::monotonic_clock::now() - start
                     );
                 },
             )
@@ -362,11 +362,11 @@ mod test {
     #[test]
     fn progresses_wasi_independent_futures() {
         crate::runtime::block_on(async {
-            let start = wasi::clocks::monotonic_clock::now();
+            let start = wasip2::clocks::monotonic_clock::now();
 
             let reactor = Reactor::current();
             const LONG_DURATION: u64 = 1_000_000_000;
-            let later = wasi::clocks::monotonic_clock::subscribe_duration(LONG_DURATION);
+            let later = wasip2::clocks::monotonic_clock::subscribe_duration(LONG_DURATION);
             let later = reactor.schedule(later);
             let mut polled_before = false;
             // This is basically futures_lite::future::yield_now, except with a boolean
@@ -391,11 +391,11 @@ mod test {
                 "wasi_independent_future should win the race"
             );
             const SHORT_DURATION: u64 = LONG_DURATION / 100;
-            let soon = wasi::clocks::monotonic_clock::subscribe_duration(SHORT_DURATION);
+            let soon = wasip2::clocks::monotonic_clock::subscribe_duration(SHORT_DURATION);
             let soon = reactor.schedule(soon);
             soon.wait_for().await;
 
-            let end = wasi::clocks::monotonic_clock::now();
+            let end = wasip2::clocks::monotonic_clock::now();
 
             let duration = end - start;
             assert!(

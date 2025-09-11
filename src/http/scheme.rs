@@ -1,4 +1,4 @@
-use wasi::http::types::Scheme as WasiScheme;
+use wasip2::http::types::Scheme as WasiScheme;
 
 pub use http::uri::{InvalidUri, Scheme};
 use std::str::FromStr;

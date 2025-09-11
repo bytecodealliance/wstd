@@ -72,7 +72,7 @@ pub use wstd_macro::attr_macro_test as test;
 
 // Re-export the wasi crate for use by the `http_server` macro.
 #[doc(hidden)]
-pub use wasi;
+pub use wasip2;
 
 pub mod prelude {
     pub use crate::future::FutureExt as _;

@@ -1,7 +1,7 @@
 use super::{Instant, Wait};
 use std::future::IntoFuture;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
-use wasi::clocks::monotonic_clock;
+use wasip2::clocks::monotonic_clock;
 
 /// A Duration type to represent a span of time, typically used for system
 /// timeouts.

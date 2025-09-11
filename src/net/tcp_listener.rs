@@ -1,5 +1,5 @@
-use wasi::sockets::network::Ipv4SocketAddress;
-use wasi::sockets::tcp::{ErrorCode, IpAddressFamily, IpSocketAddress, TcpSocket};
+use wasip2::sockets::network::Ipv4SocketAddress;
+use wasip2::sockets::tcp::{ErrorCode, IpAddressFamily, IpSocketAddress, TcpSocket};
 
 use crate::io;
 use crate::iter::AsyncIterator;
@@ -30,8 +30,8 @@ impl TcpListener {
             SocketAddr::V6(_) => IpAddressFamily::Ipv6,
         };
         let socket =
-            wasi::sockets::tcp_create_socket::create_tcp_socket(family).map_err(to_io_err)?;
-        let network = wasi::sockets::instance_network::instance_network();
+            wasip2::sockets::tcp_create_socket::create_tcp_socket(family).map_err(to_io_err)?;
+        let network = wasip2::sockets::instance_network::instance_network();
 
         let local_address = sockaddr_to_wasi(addr);
 
@@ -83,25 +83,29 @@ impl<'a> AsyncIterator for Incoming<'a> {
 
 pub(super) fn to_io_err(err: ErrorCode) -> io::Error {
     match err {
-        wasi::sockets::network::ErrorCode::Unknown => ErrorKind::Other.into(),
-        wasi::sockets::network::ErrorCode::AccessDenied => ErrorKind::PermissionDenied.into(),
-        wasi::sockets::network::ErrorCode::NotSupported => ErrorKind::Unsupported.into(),
-        wasi::sockets::network::ErrorCode::InvalidArgument => ErrorKind::InvalidInput.into(),
-        wasi::sockets::network::ErrorCode::OutOfMemory => ErrorKind::OutOfMemory.into(),
-        wasi::sockets::network::ErrorCode::Timeout => ErrorKind::TimedOut.into(),
-        wasi::sockets::network::ErrorCode::WouldBlock => ErrorKind::WouldBlock.into(),
-        wasi::sockets::network::ErrorCode::InvalidState => ErrorKind::InvalidData.into(),
-        wasi::sockets::network::ErrorCode::AddressInUse => ErrorKind::AddrInUse.into(),
-        wasi::sockets::network::ErrorCode::ConnectionRefused => ErrorKind::ConnectionRefused.into(),
-        wasi::sockets::network::ErrorCode::ConnectionReset => ErrorKind::ConnectionReset.into(),
-        wasi::sockets::network::ErrorCode::ConnectionAborted => ErrorKind::ConnectionAborted.into(),
-        wasi::sockets::network::ErrorCode::ConcurrencyConflict => ErrorKind::AlreadyExists.into(),
+        wasip2::sockets::network::ErrorCode::Unknown => ErrorKind::Other.into(),
+        wasip2::sockets::network::ErrorCode::AccessDenied => ErrorKind::PermissionDenied.into(),
+        wasip2::sockets::network::ErrorCode::NotSupported => ErrorKind::Unsupported.into(),
+        wasip2::sockets::network::ErrorCode::InvalidArgument => ErrorKind::InvalidInput.into(),
+        wasip2::sockets::network::ErrorCode::OutOfMemory => ErrorKind::OutOfMemory.into(),
+        wasip2::sockets::network::ErrorCode::Timeout => ErrorKind::TimedOut.into(),
+        wasip2::sockets::network::ErrorCode::WouldBlock => ErrorKind::WouldBlock.into(),
+        wasip2::sockets::network::ErrorCode::InvalidState => ErrorKind::InvalidData.into(),
+        wasip2::sockets::network::ErrorCode::AddressInUse => ErrorKind::AddrInUse.into(),
+        wasip2::sockets::network::ErrorCode::ConnectionRefused => {
+            ErrorKind::ConnectionRefused.into()
+        }
+        wasip2::sockets::network::ErrorCode::ConnectionReset => ErrorKind::ConnectionReset.into(),
+        wasip2::sockets::network::ErrorCode::ConnectionAborted => {
+            ErrorKind::ConnectionAborted.into()
+        }
+        wasip2::sockets::network::ErrorCode::ConcurrencyConflict => ErrorKind::AlreadyExists.into(),
         _ => ErrorKind::Other.into(),
     }
 }
 
 fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
-    use wasi::sockets::network::Ipv6SocketAddress;
+    use wasip2::sockets::network::Ipv6SocketAddress;
     match addr {
         IpSocketAddress::Ipv4(Ipv4SocketAddress { address, port }) => {
             std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
@@ -127,7 +131,7 @@ fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
 }
 
 fn sockaddr_to_wasi(addr: std::net::SocketAddr) -> IpSocketAddress {
-    use wasi::sockets::network::Ipv6SocketAddress;
+    use wasip2::sockets::network::Ipv6SocketAddress;
     match addr {
         std::net::SocketAddr::V4(addr) => {
             let ip = addr.ip().octets();

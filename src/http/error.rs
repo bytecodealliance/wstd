@@ -12,7 +12,7 @@ pub struct Error {
 
 pub use http::header::{InvalidHeaderName, InvalidHeaderValue};
 pub use http::method::InvalidMethod;
-pub use wasi::http::types::{ErrorCode as WasiHttpErrorCode, HeaderError as WasiHttpHeaderError};
+pub use wasip2::http::types::{ErrorCode as WasiHttpErrorCode, HeaderError as WasiHttpHeaderError};
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
