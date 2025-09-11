@@ -85,8 +85,9 @@ $ cargo add wstd
 ```
 
 ## Safety
-This crate uses ``#![forbid(unsafe_code)]`` to ensure everything is implemented in
-100% Safe Rust.
+This crate uses ``#![deny(unsafe_code)]``, and in the very small number of
+exceptional cases where ``#[allow(unsafe_code)]`` is required, documentation
+is provided justifying its use.
 
 ## Contributing
 Want to join us? Check out our ["Contributing" guide][contributing] and take a

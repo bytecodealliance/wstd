@@ -12,7 +12,11 @@ async fn main() -> io::Result<()> {
     while let Some(stream) = incoming.next().await {
         let stream = stream?;
         println!("Accepted from: {}", stream.peer_addr()?);
-        io::copy(&stream, &stream).await?;
+        wstd::runtime::spawn(async move {
+            // If echo copy fails, we can ignore it.
+            let _ = io::copy(&stream, &stream).await;
+        })
+        .detach();
     }
     Ok(())
 }

@@ -1,6 +1,6 @@
 #![allow(async_fn_in_trait)]
 #![warn(future_incompatible, unreachable_pub)]
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 //#![deny(missing_debug_implementations)]
 //#![warn(missing_docs)]
 //#![forbid(rustdoc::missing_doc_code_examples)]

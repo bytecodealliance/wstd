@@ -1,123 +1,121 @@
-use anyhow::{anyhow, Context, Result};
-use wasmtime::{
-    component::{Component, Linker, ResourceTable},
-    Config, Engine, Store,
-};
-use wasmtime_wasi::{pipe::MemoryOutputPipe, WasiCtx, WasiView};
-use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
-
-struct Ctx {
-    table: ResourceTable,
-    wasi: WasiCtx,
-    http: WasiHttpCtx,
-}
-
-impl WasiView for Ctx {
-    fn table(&mut self) -> &mut ResourceTable {
-        &mut self.table
-    }
-    fn ctx(&mut self) -> &mut WasiCtx {
-        &mut self.wasi
-    }
-}
-
-impl WasiHttpView for Ctx {
-    fn table(&mut self) -> &mut ResourceTable {
-        &mut self.table
-    }
-    fn ctx(&mut self) -> &mut WasiHttpCtx {
-        &mut self.http
-    }
-}
-
-fn run_in_wasmtime(wasm: &[u8], stdout: Option<MemoryOutputPipe>) -> Result<()> {
-    let config = Config::default();
-    let engine = Engine::new(&config).context("creating engine")?;
-    let component = Component::new(&engine, wasm).context("loading component")?;
-
-    let mut linker: Linker<Ctx> = Linker::new(&engine);
-    wasmtime_wasi::add_to_linker_sync(&mut linker).context("add wasi to linker")?;
-    wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker)
-        .context("add wasi-http to linker")?;
-
-    let mut builder = WasiCtx::builder();
-    builder.inherit_stderr().inherit_network();
-    let wasi = match stdout {
-        Some(stdout) => builder.stdout(stdout).build(),
-        None => builder.inherit_stdout().build(),
-    };
-    let mut store = Store::new(
-        &engine,
-        Ctx {
-            table: ResourceTable::new(),
-            wasi,
-            http: WasiHttpCtx::new(),
-        },
-    );
-
-    let instance = linker.instantiate(&mut store, &component)?;
-    let run_interface = instance
-        .get_export(&mut store, None, "wasi:cli/run@0.2.0")
-        .ok_or_else(|| anyhow!("wasi:cli/run missing?"))?;
-    let run_func_export = instance
-        .get_export(&mut store, Some(&run_interface), "run")
-        .ok_or_else(|| anyhow!("run export missing?"))?;
-    let run_func = instance
-        .get_typed_func::<(), (Result<(), ()>,)>(&mut store, &run_func_export)
-        .context("run as typed func")?;
-
-    println!("entering wasm...");
-    let (runtime_result,) = run_func.call(&mut store, ())?;
-    runtime_result.map_err(|()| anyhow!("run returned an error"))?;
-    println!("done");
-
-    Ok(())
-}
+use anyhow::{Context, Result};
+use std::process::Command;
 
 #[test_log::test]
 fn tcp_echo_server() -> Result<()> {
     use std::io::{Read, Write};
     use std::net::{Shutdown, TcpStream};
+
+    println!("testing {}", test_programs_artifacts::TCP_ECHO_SERVER);
+
+    // Run the component in wasmtime
+    // -Sinherit-network required for sockets to work
+    let mut wasmtime_process = Command::new("wasmtime")
+        .arg("run")
+        .arg("-Sinherit-network")
+        .arg(test_programs_artifacts::TCP_ECHO_SERVER)
+        .stdout(std::process::Stdio::piped())
+        .spawn()?;
+
+    let addr = get_listening_address(wasmtime_process.stdout.take().expect("stdout is piped"))?;
+
+    println!("tcp echo server is listening on {addr:?}");
+
+    let mut sock1 = TcpStream::connect(addr).context("connect sock1")?;
+    println!("sock1 connected");
+
+    let mut sock2 = TcpStream::connect(addr).context("connect sock2")?;
+    println!("sock2 connected");
+
+    const MESSAGE1: &[u8] = b"hello, echoserver!\n";
+
+    sock1.write_all(MESSAGE1).context("write to sock1")?;
+    println!("sock1 wrote to echo server");
+
+    let mut sock3 = TcpStream::connect(addr).context("connect sock3")?;
+    println!("sock3 connected");
+
+    const MESSAGE2: &[u8] = b"hello, gussie!\n";
+    sock2.write_all(MESSAGE2).context("write to sock1")?;
+    println!("sock2 wrote to echo server");
+
+    sock1.shutdown(Shutdown::Write)?;
+    sock2.shutdown(Shutdown::Write)?;
+
+    let mut readback2 = Vec::new();
+    sock2
+        .read_to_end(&mut readback2)
+        .context("read from sock2")?;
+    println!("read from sock2");
+
+    let mut readback1 = Vec::new();
+    sock1
+        .read_to_end(&mut readback1)
+        .context("read from sock1")?;
+    println!("read from sock1");
+
+    assert_eq!(MESSAGE1, readback1, "readback of sock1");
+    assert_eq!(MESSAGE2, readback2, "readback of sock2");
+
+    let mut sock4 = TcpStream::connect(addr).context("connect sock4")?;
+    println!("sock4 connected");
+    const MESSAGE4: &[u8] = b"hello, sparky!\n";
+    sock4.write_all(MESSAGE4).context("write to sock4")?;
+    // Hang up - demonstrate that a failure on this connection doesn't affect
+    // others.
+    drop(sock4);
+    println!("sock4 hung up");
+
+    const MESSAGE3: &[u8] = b"hello, willa!\n";
+    sock3.write_all(MESSAGE3).context("write to sock3")?;
+    println!("sock3 wrote to echo server");
+    sock3.shutdown(Shutdown::Write)?;
+
+    let mut readback3 = Vec::new();
+    sock3
+        .read_to_end(&mut readback3)
+        .context("read from sock3")?;
+    println!("read from sock3");
+    assert_eq!(MESSAGE3, readback3, "readback of sock3");
+
+    wasmtime_process.kill()?;
+
+    Ok(())
+}
+
+fn get_listening_address(
+    mut wasmtime_stdout: std::process::ChildStdout,
+) -> Result<std::net::SocketAddr> {
+    use std::io::Read;
     use std::thread::sleep;
     use std::time::Duration;
 
-    println!("testing {}", test_programs_artifacts::TCP_ECHO_SERVER);
-    let wasm = std::fs::read(test_programs_artifacts::TCP_ECHO_SERVER).context("read wasm")?;
-
-    let pipe = wasmtime_wasi::pipe::MemoryOutputPipe::new(1024 * 1024);
-    let write_end = pipe.clone();
-    let wasmtime_thread = std::thread::spawn(move || run_in_wasmtime(&wasm, Some(write_end)));
-
-    'wait: loop {
+    // Gather complete contents of stdout here
+    let mut stdout_contents = String::new();
+    loop {
+        // Wait for process to print
         sleep(Duration::from_millis(100));
-        for line in pipe.contents().split(|c| *c == b'\n') {
-            if line.starts_with(b"Listening on") {
-                break 'wait;
+
+        // Read more that the process printed, append to contents
+        let mut buf = vec![0; 4096];
+        let len = wasmtime_stdout
+            .read(&mut buf)
+            .context("reading wasmtime stdout")?;
+        buf.truncate(len);
+        stdout_contents
+            .push_str(std::str::from_utf8(&buf).context("wasmtime stdout should be string")?);
+
+        // Parse out the line where guest program says where it is listening
+        for line in stdout_contents.lines() {
+            if let Some(rest) = line.strip_prefix("Listening on ") {
+                // Forget wasmtime_stdout, rather than drop it, so that any
+                // subsequent stdout from wasmtime doesn't panic on a broken
+                // pipe.
+                std::mem::forget(wasmtime_stdout);
+                return rest
+                    .parse()
+                    .with_context(|| format!("parsing socket addr from line: {line:?}"));
             }
         }
     }
-
-    let mut tcpstream =
-        TcpStream::connect("127.0.0.1:8080").context("connect to wasm echo server")?;
-    println!("connected to wasm echo server");
-
-    const MESSAGE: &[u8] = b"hello, echoserver!\n";
-
-    tcpstream.write_all(MESSAGE).context("write to socket")?;
-    println!("wrote to echo server");
-
-    tcpstream.shutdown(Shutdown::Write)?;
-
-    let mut readback = Vec::new();
-    tcpstream
-        .read_to_end(&mut readback)
-        .context("read from socket")?;
-
-    println!("read from wasm server");
-    assert_eq!(MESSAGE, readback);
-
-    if wasmtime_thread.is_finished() {
-        wasmtime_thread.join().expect("wasmtime panicked")?;
-    }
-    Ok(())
 }

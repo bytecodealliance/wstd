@@ -17,7 +17,7 @@ default = ["json"]
 json = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-futures-core.workspace = true
+async-task.workspace = true
 http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
@@ -63,6 +63,7 @@ authors = [
 
 [workspace.dependencies]
 anyhow = "1"
+async-task = "4.7"
 cargo_metadata = "0.22"
 clap = { version = "4.5.26", features = ["derive"] }
 futures-core = "0.3.19"
@@ -83,9 +84,6 @@ test-programs = { path = "test-programs" }
 test-programs-artifacts = { path = "test-programs/artifacts" }
 ureq = { version = "2.12.1", default-features = false }
 wasi = "0.14.0"
-wasmtime = "26"
-wasmtime-wasi = "26"
-wasmtime-wasi-http = "26"
 wstd = { path = "." }
 wstd-macro = { path = "macro", version = "=0.5.4" }
 

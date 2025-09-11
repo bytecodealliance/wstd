@@ -1,11 +1,12 @@
 use super::REACTOR;
 
+use async_task::{Runnable, Task};
 use core::cell::RefCell;
-use core::future;
+use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll, Waker};
 use slab::Slab;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use wasi::io::poll::Pollable;
 
@@ -68,7 +69,7 @@ pub struct WaitFor {
     waitee: Waitee,
     needs_deregistration: bool,
 }
-impl future::Future for WaitFor {
+impl Future for WaitFor {
     type Output = ();
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let reactor = Reactor::current();
@@ -91,15 +92,16 @@ impl Drop for WaitFor {
 /// Manage async system resources for WASI 0.2
 #[derive(Debug, Clone)]
 pub struct Reactor {
-    inner: Rc<RefCell<InnerReactor>>,
+    inner: Rc<InnerReactor>,
 }
 
 /// The private, internal `Reactor` implementation - factored out so we can take
 /// a lock of the whole.
 #[derive(Debug)]
 struct InnerReactor {
-    pollables: Slab<Pollable>,
-    wakers: HashMap<Waitee, Waker>,
+    pollables: RefCell<Slab<Pollable>>,
+    wakers: RefCell<HashMap<Waitee, Waker>>,
+    ready_list: RefCell<VecDeque<Runnable>>,
 }
 
 impl Reactor {
@@ -119,18 +121,19 @@ impl Reactor {
     /// Create a new instance of `Reactor`
     pub(crate) fn new() -> Self {
         Self {
-            inner: Rc::new(RefCell::new(InnerReactor {
-                pollables: Slab::new(),
-                wakers: HashMap::new(),
-            })),
+            inner: Rc::new(InnerReactor {
+                pollables: RefCell::new(Slab::new()),
+                wakers: RefCell::new(HashMap::new()),
+                ready_list: RefCell::new(VecDeque::new()),
+            }),
         }
     }
 
     /// The reactor tracks the set of WASI pollables which have an associated
     /// Future pending on their readiness. This function returns indicating
     /// that set of pollables is not empty.
-    pub(crate) fn nonempty_pending_pollables(&self) -> bool {
-        !self.inner.borrow().wakers.is_empty()
+    pub(crate) fn pending_pollables_is_empty(&self) -> bool {
+        self.inner.wakers.borrow().is_empty()
     }
 
     /// Block until at least one pending pollable is ready, waking a pending future.
@@ -152,7 +155,7 @@ impl Reactor {
     pub(crate) fn nonblock_check_pollables(&self) {
         // If there are no pollables with associated pending futures, there is
         // no work to do here, so return immediately.
-        if !self.nonempty_pending_pollables() {
+        if self.pending_pollables_is_empty() {
             return;
         }
         // Lazily create a pollable which always resolves to ready.
@@ -186,7 +189,8 @@ impl Reactor {
     where
         F: FnOnce(&[&Pollable]) -> Vec<u32>,
     {
-        let reactor = self.inner.borrow();
+        let wakers = self.inner.wakers.borrow();
+        let pollables = self.inner.pollables.borrow();
 
         // We're about to wait for a number of pollables. When they wake we get
         // the *indexes* back for the pollables whose events were available - so
@@ -194,12 +198,12 @@ impl Reactor {
 
         // We start by iterating over the pollables, and keeping note of which
         // pollable belongs to which waker
-        let mut indexed_wakers = Vec::with_capacity(reactor.wakers.len());
-        let mut targets = Vec::with_capacity(reactor.wakers.len());
-        for (waitee, waker) in reactor.wakers.iter() {
+        let mut indexed_wakers = Vec::with_capacity(wakers.len());
+        let mut targets = Vec::with_capacity(wakers.len());
+        for (waitee, waker) in wakers.iter() {
             let pollable_index = waitee.pollable.0.key;
             indexed_wakers.push(waker);
-            targets.push(&reactor.pollables[pollable_index.0]);
+            targets.push(&pollables[pollable_index.0]);
         }
 
         // Now that we have that association, we're ready to check our targets for readiness.
@@ -221,32 +225,64 @@ impl Reactor {
 
     /// Turn a Wasi [`Pollable`] into an [`AsyncPollable`]
     pub fn schedule(&self, pollable: Pollable) -> AsyncPollable {
-        let mut reactor = self.inner.borrow_mut();
-        let key = EventKey(reactor.pollables.insert(pollable));
+        let mut pollables = self.inner.pollables.borrow_mut();
+        let key = EventKey(pollables.insert(pollable));
         AsyncPollable(Rc::new(Registration { key }))
     }
 
     fn deregister_event(&self, key: EventKey) {
-        let mut reactor = self.inner.borrow_mut();
-        reactor.pollables.remove(key.0);
+        let mut pollables = self.inner.pollables.borrow_mut();
+        pollables.remove(key.0);
     }
 
     fn deregister_waitee(&self, waitee: &Waitee) {
-        let mut reactor = self.inner.borrow_mut();
-        reactor.wakers.remove(waitee);
+        let mut wakers = self.inner.wakers.borrow_mut();
+        wakers.remove(waitee);
     }
 
     fn ready(&self, waitee: &Waitee, waker: &Waker) -> bool {
-        let mut reactor = self.inner.borrow_mut();
-        let ready = reactor
+        let ready = self
+            .inner
             .pollables
+            .borrow()
             .get(waitee.pollable.0.key.0)
             .expect("only live EventKey can be checked for readiness")
             .ready();
         if !ready {
-            reactor.wakers.insert(waitee.clone(), waker.clone());
+            self.inner
+                .wakers
+                .borrow_mut()
+                .insert(waitee.clone(), waker.clone());
         }
         ready
+    }
+
+    /// Spawn a `Task` on the `Reactor`.
+    pub fn spawn<F, T>(&self, fut: F) -> Task<T>
+    where
+        F: Future<Output = T> + 'static,
+        T: 'static,
+    {
+        let this = self.clone();
+        let schedule = move |runnable| this.inner.ready_list.borrow_mut().push_back(runnable);
+
+        // SAFETY:
+        // we're using this exactly like async_task::spawn_local, except that
+        // the schedule function is not Send or Sync, because Runnable is not
+        // Send or Sync. This is safe because wasm32-wasip2 is always
+        // single-threaded.
+        #[allow(unsafe_code)]
+        let (runnable, task) = unsafe { async_task::spawn_unchecked(fut, schedule) };
+        self.inner.ready_list.borrow_mut().push_back(runnable);
+        task
+    }
+
+    pub(super) fn pop_ready_list(&self) -> Option<Runnable> {
+        self.inner.ready_list.borrow_mut().pop_front()
+    }
+
+    pub(super) fn ready_list_is_empty(&self) -> bool {
+        self.inner.ready_list.borrow().is_empty()
     }
 }
 

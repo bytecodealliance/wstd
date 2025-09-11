@@ -2,14 +2,13 @@ use super::{Reactor, REACTOR};
 
 use std::future::Future;
 use std::pin::pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, Waker};
 
-/// Start the event loop
-pub fn block_on<Fut>(fut: Fut) -> Fut::Output
+/// Start the event loop. Blocks until the future
+pub fn block_on<F>(fut: F) -> F::Output
 where
-    Fut: Future,
+    F: Future + 'static,
+    F::Output: 'static,
 {
     // Construct the reactor
     let reactor = Reactor::new();
@@ -19,67 +18,44 @@ where
         panic!("cannot wstd::runtime::block_on inside an existing block_on!")
     }
 
-    // Pin the future so it can be polled
-    let mut fut = pin!(fut);
+    // Spawn the task onto the reactor.
+    let root_task = reactor.spawn(fut);
 
-    // Create a new context to be passed to the future.
-    let root = Arc::new(RootWaker::new());
-    let waker = Waker::from(root.clone());
-    let mut cx = Context::from_waker(&waker);
+    loop {
+        match reactor.pop_ready_list() {
+            // No more work is possible - only a pending pollable could
+            // possibly create a runnable, and there are none.
+            None if reactor.pending_pollables_is_empty() => break,
+            // Block until a pending pollable puts something on the ready
+            // list.
+            None => reactor.block_on_pollables(),
+            Some(runnable) => {
+                // Run the task popped from the head of the ready list. If the
+                // task re-inserts itself onto the runlist during execution,
+                // last_run_awake is a hint that guarantees us the runlist is
+                // nonempty.
+                let last_run_awake = runnable.run();
 
-    // Either the future completes and we return, or some IO is happening
-    // and we wait.
-    let res = loop {
-        match fut.as_mut().poll(&mut cx) {
-            Poll::Ready(res) => break res,
-            Poll::Pending => {
-                // If some non-pollable based future has marked the root task
-                // as awake, reset and poll again. otherwise, block until a
-                // pollable wakes a future.
-                if root.is_awake() {
+                // If any task is ready for running, we perform a nonblocking
+                // check of pollables, giving any tasks waiting on a pollable
+                // a chance to wake.
+                if last_run_awake || !reactor.ready_list_is_empty() {
                     reactor.nonblock_check_pollables();
-                    root.reset()
-                } else {
-                    // If there are no futures awake or waiting on a WASI
-                    // pollable, its impossible for the reactor to make
-                    // progress, and the only valid behaviors are to sleep
-                    // forever or panic. This should only be reachable if the
-                    // user's Futures are implemented incorrectly.
-                    if !reactor.nonempty_pending_pollables() {
-                        panic!("reactor has no futures which are awake, or are waiting on a WASI pollable to be ready")
-                    }
-                    reactor.block_on_pollables()
                 }
             }
         }
-    };
+    }
     // Clear the singleton
     REACTOR.replace(None);
-    res
-}
-
-/// This waker is used in the Context of block_on. If a Future executing in
-/// the block_on calls context.wake(), it sets this boolean state so that
-/// block_on's Future is polled again immediately, rather than waiting for
-/// an external (WASI pollable) event before polling again.
-struct RootWaker {
-    wake: AtomicBool,
-}
-impl RootWaker {
-    fn new() -> Self {
-        Self {
-            wake: AtomicBool::new(false),
+    // Get the result out of the root task
+    let mut root_task = pin!(root_task);
+    let mut noop_context = Context::from_waker(Waker::noop());
+    match root_task.as_mut().poll(&mut noop_context) {
+        Poll::Ready(res) => res,
+        Poll::Pending => {
+            unreachable!(
+                "ready list empty, therefore root task should be ready. malformed root task?"
+            )
         }
-    }
-    fn is_awake(&self) -> bool {
-        self.wake.load(Ordering::Relaxed)
-    }
-    fn reset(&self) {
-        self.wake.store(false, Ordering::Relaxed);
-    }
-}
-impl Wake for RootWaker {
-    fn wake(self: Arc<Self>) {
-        self.wake.store(true, Ordering::Relaxed);
     }
 }
