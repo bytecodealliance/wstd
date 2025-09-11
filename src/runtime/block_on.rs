@@ -23,15 +23,14 @@ where
 
     loop {
         match reactor.pop_ready_list() {
-            None => {
-                if reactor.pending_pollables_is_empty() {
-                    break;
-                } else {
-                    reactor.block_on_pollables()
-                }
-            }
+            // No more work is possible - only a pending pollable could
+            // possibly create a runnable, and there are none.
+            None if reactor.pending_pollables_is_empty() => break,
+            // Block until a pending pollable puts something on the ready
+            // list.
+            None => reactor.block_on_pollables(),
             Some(runnable) => {
-                // Run the task popped from the head of the runlist. If the
+                // Run the task popped from the head of the ready list. If the
                 // task re-inserts itself onto the runlist during execution,
                 // last_run_awake is a hint that guarantees us the runlist is
                 // nonempty.
@@ -42,13 +41,6 @@ where
                 // a chance to wake.
                 if last_run_awake || !reactor.ready_list_is_empty() {
                     reactor.nonblock_check_pollables();
-                } else if !reactor.pending_pollables_is_empty() {
-                    // If the runlist is empty, block until any of the pending
-                    // pollables have woken a task, putting it back on the
-                    // ready list
-                    reactor.block_on_pollables()
-                } else {
-                    break;
                 }
             }
         }
