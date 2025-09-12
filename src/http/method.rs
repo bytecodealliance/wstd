@@ -1,4 +1,4 @@
-use wasi::http::types::Method as WasiMethod;
+use wasip2::http::types::Method as WasiMethod;
 
 use http::method::InvalidMethod;
 pub use http::Method;

@@ -11,7 +11,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use wasi::clocks::{
+use wasip2::clocks::{
     monotonic_clock::{subscribe_duration, subscribe_instant},
     wall_clock,
 };

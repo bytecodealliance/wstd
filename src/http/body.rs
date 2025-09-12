@@ -5,7 +5,7 @@ use crate::io::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Curs
 use crate::runtime::AsyncPollable;
 use core::fmt;
 use http::header::CONTENT_LENGTH;
-use wasi::http::types::IncomingBody as WasiIncomingBody;
+use wasip2::http::types::IncomingBody as WasiIncomingBody;
 
 #[cfg(feature = "json")]
 use serde::de::DeserializeOwned;
@@ -274,12 +274,12 @@ pub struct OutgoingBody {
     // IMPORTANT: the order of these fields here matters. `stream` must
     // be dropped before `body`.
     stream: AsyncOutputStream,
-    body: wasi::http::types::OutgoingBody,
+    body: wasip2::http::types::OutgoingBody,
     dontdrop: DontDropOutgoingBody,
 }
 
 impl OutgoingBody {
-    pub(crate) fn new(stream: AsyncOutputStream, body: wasi::http::types::OutgoingBody) -> Self {
+    pub(crate) fn new(stream: AsyncOutputStream, body: wasip2::http::types::OutgoingBody) -> Self {
         Self {
             stream,
             body,
@@ -287,7 +287,7 @@ impl OutgoingBody {
         }
     }
 
-    pub(crate) fn consume(self) -> (AsyncOutputStream, wasi::http::types::OutgoingBody) {
+    pub(crate) fn consume(self) -> (AsyncOutputStream, wasip2::http::types::OutgoingBody) {
         let Self {
             stream,
             body,

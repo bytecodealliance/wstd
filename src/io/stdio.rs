@@ -1,7 +1,7 @@
 use super::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
 use std::cell::LazyCell;
-use wasi::cli::terminal_input::TerminalInput;
-use wasi::cli::terminal_output::TerminalOutput;
+use wasip2::cli::terminal_input::TerminalInput;
+use wasip2::cli::terminal_output::TerminalOutput;
 
 /// Use the program's stdin as an `AsyncInputStream`.
 #[derive(Debug)]
@@ -12,10 +12,10 @@ pub struct Stdin {
 
 /// Get the program's stdin for use as an `AsyncInputStream`.
 pub fn stdin() -> Stdin {
-    let stream = AsyncInputStream::new(wasi::cli::stdin::get_stdin());
+    let stream = AsyncInputStream::new(wasip2::cli::stdin::get_stdin());
     Stdin {
         stream,
-        terminput: LazyCell::new(wasi::cli::terminal_stdin::get_terminal_stdin),
+        terminput: LazyCell::new(wasip2::cli::terminal_stdin::get_terminal_stdin),
     }
 }
 
@@ -52,10 +52,10 @@ pub struct Stdout {
 
 /// Get the program's stdout for use as an `AsyncOutputStream`.
 pub fn stdout() -> Stdout {
-    let stream = AsyncOutputStream::new(wasi::cli::stdout::get_stdout());
+    let stream = AsyncOutputStream::new(wasip2::cli::stdout::get_stdout());
     Stdout {
         stream,
-        termoutput: LazyCell::new(wasi::cli::terminal_stdout::get_terminal_stdout),
+        termoutput: LazyCell::new(wasip2::cli::terminal_stdout::get_terminal_stdout),
     }
 }
 
@@ -97,10 +97,10 @@ pub struct Stderr {
 
 /// Get the program's stdout for use as an `AsyncOutputStream`.
 pub fn stderr() -> Stderr {
-    let stream = AsyncOutputStream::new(wasi::cli::stderr::get_stderr());
+    let stream = AsyncOutputStream::new(wasip2::cli::stderr::get_stderr());
     Stderr {
         stream,
-        termoutput: LazyCell::new(wasi::cli::terminal_stderr::get_terminal_stderr),
+        termoutput: LazyCell::new(wasip2::cli::terminal_stderr::get_terminal_stderr),
     }
 }
 

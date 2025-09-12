@@ -1,4 +1,4 @@
-use wasi::http::types::IncomingResponse;
+use wasip2::http::types::IncomingResponse;
 
 use super::{
     body::{BodyKind, IncomingBody},

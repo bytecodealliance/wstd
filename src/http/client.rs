@@ -12,7 +12,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use wasi::http::types::{
+use wasip2::http::types::{
     FutureIncomingResponse as WasiFutureIncomingResponse, OutgoingBody as WasiOutgoingBody,
     RequestOptions as WasiRequestOptions,
 };
@@ -50,7 +50,7 @@ impl Client {
         let wasi_stream = wasi_body.write().unwrap();
 
         // 1. Start sending the request head
-        let res = wasi::http::outgoing_handler::handle(wasi_req, self.wasi_options()?).unwrap();
+        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?).unwrap();
 
         // 2. Start sending the request body
         io::copy(body, AsyncOutputStream::new(wasi_stream)).await?;
@@ -86,7 +86,7 @@ impl Client {
         let wasi_stream = wasi_body.write().unwrap();
 
         // Start sending the request head.
-        let res = wasi::http::outgoing_handler::handle(wasi_req, self.wasi_options()?).unwrap();
+        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?).unwrap();
 
         let outgoing_body = OutgoingBody::new(AsyncOutputStream::new(wasi_stream), wasi_body);
 
@@ -141,7 +141,7 @@ impl Client {
             None => None,
         };
 
-        wasi::http::types::OutgoingBody::finish(body, wasi_trailers)
+        wasip2::http::types::OutgoingBody::finish(body, wasi_trailers)
             .expect("body length did not match Content-Length header value");
         Ok(())
     }

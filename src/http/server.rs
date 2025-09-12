@@ -28,8 +28,8 @@ use super::{
 };
 use crate::io::{copy, AsyncOutputStream};
 use http::header::CONTENT_LENGTH;
-use wasi::exports::http::incoming_handler::ResponseOutparam;
-use wasi::http::types::OutgoingResponse;
+use wasip2::exports::http::incoming_handler::ResponseOutparam;
+use wasip2::http::types::OutgoingResponse;
 
 /// This is passed into the [`http_server`] `main` function and holds the state
 /// needed for a handler to produce a response, or fail. There are two ways to
@@ -179,7 +179,7 @@ impl Finished {
         let wasi_trailers =
             trailers.map(|trailers| header_map_to_wasi(&trailers).expect("header error"));
 
-        wasi::http::types::OutgoingBody::finish(body, wasi_trailers)
+        wasip2::http::types::OutgoingBody::finish(body, wasi_trailers)
             .expect("body length did not match Content-Length header value");
 
         Self(())

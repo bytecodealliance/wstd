@@ -1,7 +1,7 @@
 use super::{Duration, Wait};
 use std::future::IntoFuture;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
-use wasi::clocks::monotonic_clock;
+use wasip2::clocks::monotonic_clock;
 
 /// A measurement of a monotonically nondecreasing clock. Opaque and useful only
 /// with Duration.
@@ -24,7 +24,7 @@ impl Instant {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        Instant(wasi::clocks::monotonic_clock::now())
+        Instant(wasip2::clocks::monotonic_clock::now())
     }
 
     /// Returns the amount of time elapsed from another instant to this one, or zero duration if
