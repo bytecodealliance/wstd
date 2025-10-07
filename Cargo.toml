@@ -18,6 +18,7 @@ json = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 async-task.workspace = true
+futures-core.workspace = true
 http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true

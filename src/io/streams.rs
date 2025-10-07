@@ -1,7 +1,8 @@
 use super::{AsyncPollable, AsyncRead, AsyncWrite};
-use std::cell::OnceCell;
+use crate::runtime::WaitFor;
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
+use std::sync::{Mutex, OnceLock};
 use std::task::{Context, Poll};
 use wasip2::io::streams::{InputStream, OutputStream, StreamError};
 
@@ -9,9 +10,10 @@ use wasip2::io::streams::{InputStream, OutputStream, StreamError};
 /// `AsyncPollable`.
 #[derive(Debug)]
 pub struct AsyncInputStream {
+    wait_for: Mutex<Option<Pin<Box<WaitFor>>>>,
     // Lazily initialized pollable, used for lifetime of stream to check readiness.
     // Field ordering matters: this child must be dropped before stream
-    subscription: OnceCell<AsyncPollable>,
+    subscription: OnceLock<AsyncPollable>,
     stream: InputStream,
 }
 
@@ -19,7 +21,8 @@ impl AsyncInputStream {
     /// Construct an `AsyncInputStream` from a WASI `InputStream` resource.
     pub fn new(stream: InputStream) -> Self {
         Self {
-            subscription: OnceCell::new(),
+            wait_for: Mutex::new(None),
+            subscription: OnceLock::new(),
             stream,
         }
     }
@@ -28,10 +31,16 @@ impl AsyncInputStream {
         let subscription = self
             .subscription
             .get_or_init(|| AsyncPollable::new(self.stream.subscribe()));
-        // Wait on readiness
-        let wait_for = subscription.wait_for();
-        let mut pinned = std::pin::pin!(wait_for);
-        pinned.as_mut().poll(cx)
+        // Lazily initialize the WaitFor. Clear it after it becomes ready.
+        let mut wait_for_slot = self.wait_for.lock().unwrap();
+        let wait_for = wait_for_slot.get_or_insert_with(|| Box::pin(subscription.wait_for()));
+        match wait_for.as_mut().poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(()) => {
+                let _ = wait_for_slot.take();
+                Poll::Ready(())
+            }
+        }
     }
     /// Await for read readiness.
     async fn ready(&self) {
@@ -193,7 +202,7 @@ impl futures_core::stream::Stream for AsyncInputByteStream {
 pub struct AsyncOutputStream {
     // Lazily initialized pollable, used for lifetime of stream to check readiness.
     // Field ordering matters: this child must be dropped before stream
-    subscription: OnceCell<AsyncPollable>,
+    subscription: OnceLock<AsyncPollable>,
     stream: OutputStream,
 }
 
@@ -201,7 +210,7 @@ impl AsyncOutputStream {
     /// Construct an `AsyncOutputStream` from a WASI `OutputStream` resource.
     pub fn new(stream: OutputStream) -> Self {
         Self {
-            subscription: OnceCell::new(),
+            subscription: OnceLock::new(),
             stream,
         }
     }
@@ -300,9 +309,8 @@ pub(crate) async fn splice(
     len: u64,
 ) -> Result<u64, StreamError> {
     // Wait for both streams to be ready.
-    let r = reader.ready();
+    reader.ready().await;
     writer.ready().await;
-    r.await;
 
     writer.stream.splice(&reader.stream, len)
 }
