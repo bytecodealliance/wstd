@@ -126,10 +126,10 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
     quote! {
         struct TheServer;
 
-        impl ::wstd::wasip2::exports::http::incoming_handler::Guest for TheServer {
+        impl ::wstd::__internal::wasip2::exports::http::incoming_handler::Guest for TheServer {
             fn handle(
-                request: ::wstd::wasip2::http::types::IncomingRequest,
-                response_out: ::wstd::wasip2::http::types::ResponseOutparam
+                request: ::wstd::__internal::wasip2::http::types::IncomingRequest,
+                response_out: ::wstd::__internal::wasip2::http::types::ResponseOutparam
             ) {
                 #(#attrs)*
                 #vis async fn __run(#inputs) #output {
@@ -146,7 +146,7 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
             }
         }
 
-        ::wstd::wasip2::http::proxy::export!(TheServer with_types_in ::wstd::wasip2);
+        ::wstd::__internal::wasip2::http::proxy::export!(TheServer with_types_in ::wstd::__internal::wasip2);
 
         // Provide an actual function named `main`.
         //

@@ -70,9 +70,14 @@ pub use wstd_macro::attr_macro_http_server as http_server;
 pub use wstd_macro::attr_macro_main as main;
 pub use wstd_macro::attr_macro_test as test;
 
-// Re-export the wasi crate for use by the `http_server` macro.
+// Re-export the wasip2 crate for use only by `wstd-macro` macros. The proc
+// macros need to generate code that uses these definitions, but we don't want
+// to treat it as part of our public API with regards to semver, so we keep it
+// under `__internal` as well as doc(hidden) to indicate it is private.
 #[doc(hidden)]
-pub use wasip2;
+pub mod __internal {
+    pub use wasip2;
+}
 
 pub mod prelude {
     pub use crate::future::FutureExt as _;
