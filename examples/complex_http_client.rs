@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
             Some(Ok(t))
         }
     });
-    let request = request.body(body)?;
+    let request = request.body(Body::from_http_body(body))?;
 
     // Send the request.
     eprintln!("> {} / {:?}", request.method(), request.version());

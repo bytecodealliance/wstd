@@ -1,5 +1,5 @@
 use std::error::Error;
-use wstd::http::{Body, Client, HeaderValue, Request};
+use wstd::http::{Client, HeaderValue, Request};
 
 #[wstd::test]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "content-type",
             HeaderValue::from_str("application/json; charset=utf-8")?,
         )
-        .body(Body::from_string("{\"test\": \"data\"}"))?;
+        .body("{\"test\": \"data\"}")?;
 
     let response = Client::new().send(request).await?;
 
@@ -19,9 +19,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(content_type, "application/json; charset=utf-8");
 
     let mut body = response.into_body();
-    let body_buf = body.contents().await?;
+    let val: serde_json::Value = body.json().await?;
 
-    let val: serde_json::Value = serde_json::from_slice(body_buf)?;
     let body_url = val
         .get("url")
         .ok_or("body json has url")?

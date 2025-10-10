@@ -24,6 +24,20 @@ pub mod util {
     pub use http_body_util::*;
 }
 
+/// A HTTP Body.
+///
+/// Construct this HTTP body using:
+/// * `Body::empty` for the empty body, or `impl From<()> for Body`
+/// * `From<&[u8]>` (which will make a clone) or `From<Vec<u8>>` or
+///   `From<Bytes>` for a `Body` from bytes.
+/// * `From<&str>` (which will make a clone) or `From<String>` for a `Body`
+///   from strings.
+/// * `Body::from_json` for a `Body` from a `Serialize` (requires feature
+///   `json`)
+/// * `Body::from_stream` or `Body::from_try_stream` for a `Body` from a
+///   `Stream` of `Into<Bytes>`
+///
+/// Consume
 #[derive(Debug)]
 pub struct Body(BodyInner);
 
@@ -41,7 +55,7 @@ enum BodyInner {
 }
 
 impl Body {
-    pub async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
+    pub(crate) async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
         match self.0 {
             BodyInner::Incoming(incoming) => incoming.send(outgoing_body).await,
             BodyInner::Boxed(box_body) => {
@@ -107,17 +121,6 @@ impl Body {
         }
     }
 
-    pub fn as_boxed_body(&mut self) -> &mut UnsyncBoxBody<Bytes, Error> {
-        let mut prev = Self::empty();
-        std::mem::swap(self, &mut prev);
-        self.0 = BodyInner::Boxed(prev.into_boxed_body());
-
-        match &mut self.0 {
-            BodyInner::Boxed(ref mut b) => b,
-            _ => unreachable!(),
-        }
-    }
-
     pub async fn contents(&mut self) -> Result<&[u8], Error> {
         match &mut self.0 {
             BodyInner::Complete { ref data, .. } => Ok(data.as_ref()),
@@ -154,17 +157,10 @@ impl Body {
         }
     }
 
+    /// Construct an empty Body
     pub fn empty() -> Self {
         Body(BodyInner::Complete {
             data: Bytes::new(),
-            trailers: None,
-        })
-    }
-
-    pub fn from_string(s: impl Into<String>) -> Self {
-        let s = s.into();
-        Body(BodyInner::Complete {
-            data: Bytes::from_owner(s.into_bytes()),
             trailers: None,
         })
     }
@@ -174,14 +170,9 @@ impl Body {
         std::str::from_utf8(bs).context("decoding body contents as string")
     }
 
-    pub fn from_bytes(b: impl Into<Bytes>) -> Self {
-        let b = b.into();
-        Body::from(http_body_util::Full::new(b))
-    }
-
     #[cfg(feature = "json")]
     pub fn from_json<T: serde::Serialize>(data: &T) -> Result<Self, serde_json::Error> {
-        Ok(Self::from_string(serde_json::to_string(data)?))
+        Ok(Self::from(serde_json::to_vec(data)?))
     }
 
     #[cfg(feature = "json")]
@@ -190,28 +181,38 @@ impl Body {
         serde_json::from_str(str).context("decoding body contents as json")
     }
 
-    pub fn from_input_stream(r: crate::io::AsyncInputStream) -> Self {
-        use futures_lite::stream::StreamExt;
-        Body(BodyInner::Boxed(http_body_util::BodyExt::boxed_unsync(
-            http_body_util::StreamBody::new(r.into_stream().map(|res| {
-                res.map(|bytevec| Frame::data(Bytes::from_owner(bytevec)))
-                    .map_err(Into::into)
-            })),
-        )))
-    }
-
     pub(crate) fn from_incoming(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
         Body(BodyInner::Incoming(Incoming { body, size_hint }))
     }
-}
 
-impl<B> From<B> for Body
-where
-    B: HttpBody + Send + 'static,
-    <B as HttpBody>::Data: Into<Bytes>,
-    <B as HttpBody>::Error: Into<Error>,
-{
-    fn from(http_body: B) -> Body {
+    pub fn from_stream<S>(stream: S) -> Self
+    where
+        S: futures_lite::Stream + Send + 'static,
+        <S as futures_lite::Stream>::Item: Into<Bytes>,
+    {
+        use futures_lite::StreamExt;
+        Self::from_http_body(http_body_util::StreamBody::new(
+            stream.map(|bs| Ok::<_, Error>(Frame::data(bs.into()))),
+        ))
+    }
+
+    pub fn from_try_stream<S, D>(stream: S) -> Self
+    where
+        S: futures_lite::Stream<Item = Result<D, Error>> + Send + 'static,
+        D: Into<Bytes>,
+    {
+        use futures_lite::StreamExt;
+        Self::from_http_body(http_body_util::StreamBody::new(
+            stream.map(|bs| Ok::<_, Error>(Frame::data(bs?.into()))),
+        ))
+    }
+
+    pub fn from_http_body<B>(http_body: B) -> Self
+    where
+        B: HttpBody + Send + 'static,
+        <B as HttpBody>::Data: Into<Bytes>,
+        <B as HttpBody>::Error: Into<Error>,
+    {
         use util::BodyExt;
         Body(BodyInner::Boxed(
             http_body
@@ -222,9 +223,52 @@ where
     }
 }
 
-impl From<Incoming> for Body {
-    fn from(incoming: Incoming) -> Body {
-        Body(BodyInner::Incoming(incoming))
+impl From<()> for Body {
+    fn from(_: ()) -> Body {
+        Body::empty()
+    }
+}
+impl From<&[u8]> for Body {
+    fn from(bytes: &[u8]) -> Body {
+        Body::from(bytes.to_owned())
+    }
+}
+impl From<Vec<u8>> for Body {
+    fn from(bytes: Vec<u8>) -> Body {
+        Body::from(Bytes::from(bytes))
+    }
+}
+impl From<Bytes> for Body {
+    fn from(data: Bytes) -> Body {
+        Body(BodyInner::Complete {
+            data,
+            trailers: None,
+        })
+    }
+}
+impl From<&str> for Body {
+    fn from(data: &str) -> Body {
+        Body::from(data.as_bytes())
+    }
+}
+impl From<String> for Body {
+    fn from(data: String) -> Body {
+        Body::from(data.into_bytes())
+    }
+}
+
+impl From<crate::io::AsyncInputStream> for Body {
+    fn from(r: crate::io::AsyncInputStream) -> Body {
+        // TODO: with another BodyInner variant for a boxed AsyncRead for which
+        // as_input_stream is_some, this could allow for use of
+        // crate::io::copy.
+        use futures_lite::stream::StreamExt;
+        Body(BodyInner::Boxed(http_body_util::BodyExt::boxed_unsync(
+            http_body_util::StreamBody::new(r.into_stream().map(|res| {
+                res.map(|bytevec| Frame::data(Bytes::from_owner(bytevec)))
+                    .map_err(Into::into)
+            })),
+        )))
     }
 }
 

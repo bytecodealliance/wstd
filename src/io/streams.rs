@@ -116,6 +116,18 @@ impl AsyncRead for AsyncInputStream {
     }
 }
 
+#[async_trait::async_trait(?Send)]
+impl AsyncRead for &AsyncInputStream {
+    async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        Self::read(self, buf).await
+    }
+
+    #[inline]
+    fn as_async_input_stream(&self) -> Option<&AsyncInputStream> {
+        Some(self)
+    }
+}
+
 /// Wrapper of `AsyncInputStream` that impls `futures_lite::stream::Stream`
 /// with an item of `Result<Vec<u8>, std::io::Error>`
 pub struct AsyncInputChunkStream {

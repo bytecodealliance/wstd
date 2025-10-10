@@ -49,18 +49,16 @@ async fn http_wait_body(_request: Request<Body>) -> Result<Response<Body>> {
     // Get the time now
     let now = Instant::now();
 
-    let body = StreamBody::new(once_future(async move {
+    let body = async move {
         // Sleep for one second.
         wstd::task::sleep(Duration::from_secs(1)).await;
 
         // Compute how long we slept for.
         let elapsed = Instant::now().duration_since(now).as_millis();
-        anyhow::Ok(Frame::data(Bytes::from(format!(
-            "slept for {elapsed} millis\n"
-        ))))
-    }));
+        Ok(Bytes::from(format!("slept for {elapsed} millis\n")))
+    };
 
-    Ok(Response::new(body.into()))
+    Ok(Response::new(Body::from_try_stream(once_future(body))))
 }
 
 async fn http_echo(request: Request<Body>) -> Result<Response<Body>> {
@@ -85,7 +83,7 @@ async fn http_echo_trailers(request: Request<Body>) -> Result<Response<Body>> {
     let body = StreamBody::new(once_future(async move {
         anyhow::Ok(Frame::<Bytes>::trailers(trailers))
     }));
-    Ok(Response::new(body.into()))
+    Ok(Response::new(Body::from_http_body(body)))
 }
 
 async fn http_response_status(request: Request<Body>) -> Result<Response<Body>> {
@@ -112,7 +110,7 @@ async fn http_body_fail(_request: Request<Body>) -> Result<Response<Body>> {
         Err::<Frame<Bytes>, _>(anyhow::anyhow!("error creating body"))
     }));
 
-    Ok(Response::new(body.into()))
+    Ok(Response::new(Body::from_http_body(body)))
 }
 
 async fn http_not_found(_request: Request<Body>) -> Result<Response<Body>> {
