@@ -29,9 +29,15 @@ pub struct Body(BodyInner);
 
 #[derive(Debug)]
 enum BodyInner {
+    // a boxed http_body::Body impl
     Boxed(UnsyncBoxBody<Bytes, Error>),
+    // a body created from a wasi-http incoming-body (WasiIncomingBody)
     Incoming(Incoming),
-    Complete(Bytes),
+    // a body in memory
+    Complete {
+        data: Bytes,
+        trailers: Option<HeaderMap>,
+    },
 }
 
 impl Body {
@@ -69,15 +75,18 @@ impl Body {
                     }
                 }
             }
-            BodyInner::Complete(bytes) => {
+            BodyInner::Complete { data, trailers } => {
                 let mut out_stream = AsyncOutputStream::new(
                     outgoing_body
                         .write()
                         .expect("outgoing body already written"),
                 );
-                out_stream.write_all(&bytes).await?;
+                out_stream.write_all(&data).await?;
                 drop(out_stream);
-                WasiOutgoingBody::finish(outgoing_body, None)
+                let trailers = trailers
+                    .map(|t| header_map_to_wasi(&t).context("trailers"))
+                    .transpose()?;
+                WasiOutgoingBody::finish(outgoing_body, trailers)
                     .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
                 Ok(())
             }
@@ -90,8 +99,9 @@ impl Body {
         }
         match self.0 {
             BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
-            BodyInner::Complete(bytes) => http_body_util::Full::new(bytes)
+            BodyInner::Complete { data, trailers } => http_body_util::Full::new(data)
                 .map_err(map_e)
+                .with_trailers(async move { Ok(trailers).transpose() })
                 .boxed_unsync(),
             BodyInner::Boxed(b) => b,
         }
@@ -110,19 +120,26 @@ impl Body {
 
     pub async fn contents(&mut self) -> Result<&[u8], Error> {
         match &mut self.0 {
-            BodyInner::Complete(ref bs) => Ok(bs.as_ref()),
+            BodyInner::Complete { ref data, .. } => Ok(data.as_ref()),
             inner => {
-                let mut prev = BodyInner::Complete(Bytes::new());
+                let mut prev = BodyInner::Complete {
+                    data: Bytes::new(),
+                    trailers: None,
+                };
                 std::mem::swap(inner, &mut prev);
                 let boxed_body = match prev {
                     BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
                     BodyInner::Boxed(b) => b,
-                    BodyInner::Complete(_) => unreachable!(),
+                    BodyInner::Complete { .. } => unreachable!(),
                 };
                 let collected = boxed_body.collect().await?;
-                *inner = BodyInner::Complete(collected.to_bytes());
+                let trailers = collected.trailers().cloned();
+                *inner = BodyInner::Complete {
+                    data: collected.to_bytes(),
+                    trailers,
+                };
                 Ok(match inner {
-                    BodyInner::Complete(ref bs) => bs.as_ref(),
+                    BodyInner::Complete { ref data, .. } => data.as_ref(),
                     _ => unreachable!(),
                 })
             }
@@ -132,18 +149,24 @@ impl Body {
     pub fn content_length(&self) -> Option<u64> {
         match &self.0 {
             BodyInner::Boxed(b) => b.size_hint().exact(),
-            BodyInner::Complete(bs) => Some(bs.len() as u64),
+            BodyInner::Complete { data, .. } => Some(data.len() as u64),
             BodyInner::Incoming(i) => i.size_hint.content_length(),
         }
     }
 
     pub fn empty() -> Self {
-        Body(BodyInner::Complete(Bytes::new()))
+        Body(BodyInner::Complete {
+            data: Bytes::new(),
+            trailers: None,
+        })
     }
 
     pub fn from_string(s: impl Into<String>) -> Self {
         let s = s.into();
-        Body(BodyInner::Complete(Bytes::from_owner(s.into_bytes())))
+        Body(BodyInner::Complete {
+            data: Bytes::from_owner(s.into_bytes()),
+            trailers: None,
+        })
     }
 
     pub async fn str_contents(&mut self) -> Result<&str, Error> {
