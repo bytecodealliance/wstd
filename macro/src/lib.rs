@@ -92,7 +92,7 @@ pub fn attr_macro_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[wstd::http_server]
-/// async fn main(request: Request<IncomingBody>) -> Result<Response<impl Body>> {
+/// async fn main(request: Request<Body>) -> Result<Response<Body>> {
 ///     Ok(Response::new("Hello!\n".into_body()))
 /// }
 /// ```

@@ -5,9 +5,9 @@
 //! [`http_server`] macro:
 //!
 //! ```no_run
-//! use wstd::http::{Request, Response, Incoming, Body, Error};
+//! use wstd::http::{Request, Response, Body, Error};
 //! #[wstd::http_server]
-//! async fn main(_request: Request<Incoming>) -> Result<Response<Body>, Error> {
+//! async fn main(_request: Request<Body>) -> Result<Response<Body>, Error> {
 //!     Ok(Response::new("Hello!\n".to_string().into()))
 //! }
 //! ```

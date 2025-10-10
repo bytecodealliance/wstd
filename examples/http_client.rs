@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
         eprintln!("< {key}: {value}");
     }
 
-    let body = response.into_body().into_http_body().collect().await?;
+    let body = response.into_body().into_boxed_body().collect().await?;
     let trailers = body.trailers().cloned();
     wstd::io::stdout()
         .write_all(body.to_bytes().as_ref())

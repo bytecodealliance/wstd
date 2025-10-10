@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("response expected to have Content-Type header")?;
     assert_eq!(content_type, "application/json; charset=utf-8");
 
-    let mut body = response.into_body().into_body();
+    let mut body = response.into_body();
     let body_len = body
         .content_length()
         .ok_or("GET postman-echo.com/get is supposed to provide a content-length")?;

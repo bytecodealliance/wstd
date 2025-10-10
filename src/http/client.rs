@@ -1,4 +1,4 @@
-use super::{body::Incoming, Body, Error, Request, Response};
+use super::{Body, Error, Request, Response};
 use crate::http::request::try_into_outgoing;
 use crate::http::response::try_from_incoming;
 use crate::io::AsyncPollable;
@@ -24,7 +24,7 @@ impl Client {
     }
 
     /// Send an HTTP request.
-    pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Incoming>, Error> {
+    pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
         let (wasi_req, body) = try_into_outgoing(req)?;
         let body = body.into();
         let wasi_body = wasi_req.body().unwrap();

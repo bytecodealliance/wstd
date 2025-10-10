@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("response expected to have Content-Type header")?;
     assert_eq!(content_type, "application/json; charset=utf-8");
 
-    let Echo { url } = response.into_body().into_body().json::<Echo>().await?;
+    let Echo { url } = response.into_body().json::<Echo>().await?;
     assert!(
         url.contains("postman-echo.com/post"),
         "expected body url to contain the authority and path, got: {url}"

@@ -1,5 +1,5 @@
 use super::{
-    body::{BodyHint, Incoming},
+    body::{Body, BodyHint},
     error::{Context, Error, ErrorCode},
     fields::{header_map_from_wasi, header_map_to_wasi},
     method::{from_wasi_method, to_wasi_method},
@@ -53,7 +53,7 @@ pub(crate) fn try_into_outgoing<T>(request: Request<T>) -> Result<(OutgoingReque
 
 /// This is used by the `http_server` macro.
 #[doc(hidden)]
-pub fn try_from_incoming(incoming: IncomingRequest) -> Result<Request<Incoming>, Error> {
+pub fn try_from_incoming(incoming: IncomingRequest) -> Result<Request<Body>, Error> {
     let headers: HeaderMap = header_map_from_wasi(incoming.headers())
         .context("headers provided by wasi rejected by http::HeaderMap")?;
 
@@ -87,7 +87,7 @@ pub fn try_from_incoming(incoming: IncomingRequest) -> Result<Request<Incoming>,
     let incoming_body = incoming
         .consume()
         .expect("`consume` should not have been called previously on this incoming-request");
-    let body = Incoming::new(incoming_body, hint);
+    let body = Body::from_incoming(incoming_body, hint);
 
     let mut uri = Uri::builder();
     if let Some(scheme) = scheme {

@@ -25,10 +25,10 @@ pub mod util {
 }
 
 #[derive(Debug)]
-pub struct Body(pub(crate) BodyInner);
+pub struct Body(BodyInner);
 
 #[derive(Debug)]
-pub(crate) enum BodyInner {
+enum BodyInner {
     Boxed(UnsyncBoxBody<Bytes, Error>),
     Incoming(Incoming),
     Complete(Bytes),
@@ -37,37 +37,7 @@ pub(crate) enum BodyInner {
 impl Body {
     pub async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
         match self.0 {
-            BodyInner::Incoming(incoming) => {
-                let in_body = incoming.into_inner();
-                let mut in_stream =
-                    AsyncInputStream::new(in_body.stream().expect("incoming body already read"));
-                let mut out_stream = AsyncOutputStream::new(
-                    outgoing_body
-                        .write()
-                        .expect("outgoing body already written"),
-                );
-                crate::io::copy(&mut in_stream, &mut out_stream)
-                    .await
-                    .map_err(|e| {
-                        Error::from(e)
-                            .context("copying incoming body stream to outgoing body stream")
-                    })?;
-                drop(in_stream);
-                drop(out_stream);
-                let future_in_trailers = WasiIncomingBody::finish(in_body);
-                Reactor::current()
-                    .schedule(future_in_trailers.subscribe())
-                    .wait_for()
-                    .await;
-                let in_trailers: Option<wasip2::http::types::Fields> = future_in_trailers
-                    .get()
-                    .expect("pollable ready")
-                    .expect("got once")
-                    .map_err(|e| Error::from(e).context("recieving incoming trailers"))?;
-                WasiOutgoingBody::finish(outgoing_body, in_trailers)
-                    .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
-                Ok(())
-            }
+            BodyInner::Incoming(incoming) => incoming.send(outgoing_body).await,
             BodyInner::Boxed(box_body) => {
                 let mut out_stream = AsyncOutputStream::new(
                     outgoing_body
@@ -115,10 +85,13 @@ impl Body {
     }
 
     pub fn into_boxed_body(self) -> UnsyncBoxBody<Bytes, Error> {
+        fn map_e(_: std::convert::Infallible) -> Error {
+            unreachable!()
+        }
         match self.0 {
             BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
             BodyInner::Complete(bytes) => http_body_util::Full::new(bytes)
-                .map_err(annotate_err)
+                .map_err(map_e)
                 .boxed_unsync(),
             BodyInner::Boxed(b) => b,
         }
@@ -203,10 +176,10 @@ impl Body {
             })),
         )))
     }
-}
 
-fn annotate_err<E>(_: E) -> Error {
-    unreachable!()
+    pub(crate) fn from_incoming(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
+        Body(BodyInner::Incoming(Incoming { body, size_hint }))
+    }
 }
 
 impl<B> From<B> for Body
@@ -233,24 +206,44 @@ impl From<Incoming> for Body {
 }
 
 #[derive(Debug)]
-pub struct Incoming {
+struct Incoming {
     body: WasiIncomingBody,
     size_hint: BodyHint,
 }
 
 impl Incoming {
-    pub(crate) fn new(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
-        Self { body, size_hint }
-    }
-    /// Use with `http_body::Body` trait
-    pub fn into_http_body(self) -> IncomingBody {
+    fn into_http_body(self) -> IncomingBody {
         IncomingBody::new(self.body, self.size_hint)
     }
-    pub fn into_body(self) -> Body {
-        self.into()
-    }
-    pub fn into_inner(self) -> WasiIncomingBody {
-        self.body
+    async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
+        let in_body = self.body;
+        let mut in_stream =
+            AsyncInputStream::new(in_body.stream().expect("incoming body already read"));
+        let mut out_stream = AsyncOutputStream::new(
+            outgoing_body
+                .write()
+                .expect("outgoing body already written"),
+        );
+        crate::io::copy(&mut in_stream, &mut out_stream)
+            .await
+            .map_err(|e| {
+                Error::from(e).context("copying incoming body stream to outgoing body stream")
+            })?;
+        drop(in_stream);
+        drop(out_stream);
+        let future_in_trailers = WasiIncomingBody::finish(in_body);
+        Reactor::current()
+            .schedule(future_in_trailers.subscribe())
+            .wait_for()
+            .await;
+        let in_trailers: Option<wasip2::http::types::Fields> = future_in_trailers
+            .get()
+            .expect("pollable ready")
+            .expect("got once")
+            .map_err(|e| Error::from(e).context("recieving incoming trailers"))?;
+        WasiOutgoingBody::finish(outgoing_body, in_trailers)
+            .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
+        Ok(())
     }
 }
 
