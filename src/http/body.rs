@@ -34,10 +34,14 @@ pub mod util {
 ///   from strings.
 /// * `Body::from_json` for a `Body` from a `Serialize` (requires feature
 ///   `json`)
+/// * `From<AsyncInputStream>` for a `Body` with contents given by the
+///   contents of a WASI input-stream.
 /// * `Body::from_stream` or `Body::from_try_stream` for a `Body` from a
 ///   `Stream` of `Into<Bytes>`
 ///
-/// Consume
+/// Consume this HTTP body using:
+///
+///
 #[derive(Debug)]
 pub struct Body(BodyInner);
 
@@ -107,6 +111,10 @@ impl Body {
         }
     }
 
+    /// Convert this `Body` into an `UnsyncBoxBody<Bytes, Error>`, which
+    /// exists to implement the `http_body::Body` trait. Consume the contents
+    /// using `http_body_utils::BodyExt`, or anywhere else an impl of
+    /// `http_body::Body` is accepted.
     pub fn into_boxed_body(self) -> UnsyncBoxBody<Bytes, Error> {
         fn map_e(_: std::convert::Infallible) -> Error {
             unreachable!()
@@ -121,6 +129,9 @@ impl Body {
         }
     }
 
+    /// Collect the entire contents of this `Body`, and expose them as a
+    /// byte slice. This async fn will be pending until the entire `Body` is
+    /// copied into memory, or an error occurs.
     pub async fn contents(&mut self) -> Result<&[u8], Error> {
         match &mut self.0 {
             BodyInner::Complete { ref data, .. } => Ok(data.as_ref()),
@@ -149,6 +160,11 @@ impl Body {
         }
     }
 
+    /// Get a value for the length of this `Body`'s content, in bytes, if
+    /// known. This value can come from either the Content-Length header
+    /// recieved in the incoming request or response assocated with the body,
+    /// or be provided by an exact `http_body::Body::size_hint` if the `Body`
+    /// is constructed from an `http_body::Body` impl.
     pub fn content_length(&self) -> Option<u64> {
         match &self.0 {
             BodyInner::Boxed(b) => b.size_hint().exact(),
@@ -165,16 +181,25 @@ impl Body {
         })
     }
 
+    /// Collect the entire contents of this `Body`, and expose them as a
+    /// string slice. This async fn will be pending until the entire `Body` is
+    /// copied into memory, or an error occurs. Additonally errors if the
+    /// contents of the `Body` were not a utf-8 encoded string.
     pub async fn str_contents(&mut self) -> Result<&str, Error> {
         let bs = self.contents().await?;
         std::str::from_utf8(bs).context("decoding body contents as string")
     }
 
+    /// Construct a `Body` by serializing a type to json. Can fail with a
+    /// `serde_json::Error` if serilization fails.
     #[cfg(feature = "json")]
     pub fn from_json<T: serde::Serialize>(data: &T) -> Result<Self, serde_json::Error> {
         Ok(Self::from(serde_json::to_vec(data)?))
     }
 
+    /// Collect the entire contents of this `Body`, and deserialize them from
+    /// json. Can fail if the body contents are not utf-8 encoded, are not
+    /// valid json, or the json is not accepted by the `serde::Deserialize` impl.
     #[cfg(feature = "json")]
     pub async fn json<T: for<'a> serde::Deserialize<'a>>(&mut self) -> Result<T, Error> {
         let str = self.str_contents().await?;
@@ -185,6 +210,8 @@ impl Body {
         Body(BodyInner::Incoming(Incoming { body, size_hint }))
     }
 
+    /// Construct a `Body` backed by a `futures_lite::Stream` impl. The stream
+    /// will be polled as the body is sent.
     pub fn from_stream<S>(stream: S) -> Self
     where
         S: futures_lite::Stream + Send + 'static,
@@ -196,10 +223,14 @@ impl Body {
         ))
     }
 
-    pub fn from_try_stream<S, D>(stream: S) -> Self
+    /// Construct a `Body` backed by a `futures_lite::Stream` impl. The stream
+    /// will be polled as the body is sent. If the stream gives an error, the
+    /// body will canceled, which closes the underlying connection.
+    pub fn from_try_stream<S, D, E>(stream: S) -> Self
     where
-        S: futures_lite::Stream<Item = Result<D, Error>> + Send + 'static,
+        S: futures_lite::Stream<Item = Result<D, E>> + Send + 'static,
         D: Into<Bytes>,
+        E: std::error::Error + Send + Sync + 'static,
     {
         use futures_lite::StreamExt;
         Self::from_http_body(http_body_util::StreamBody::new(
@@ -207,6 +238,12 @@ impl Body {
         ))
     }
 
+    /// Construct a `Body` backed by a `http_body::Body`. The http_body will
+    /// be polled as the body is sent. If the http_body poll gives an error,
+    /// the body will be canceled, which closes the underlying connection.
+    ///
+    /// Note, this is the only constructor which permits adding trailers to
+    /// the `Body`.
     pub fn from_http_body<B>(http_body: B) -> Self
     where
         B: HttpBody + Send + 'static,
@@ -259,9 +296,12 @@ impl From<String> for Body {
 
 impl From<crate::io::AsyncInputStream> for Body {
     fn from(r: crate::io::AsyncInputStream) -> Body {
-        // TODO: with another BodyInner variant for a boxed AsyncRead for which
-        // as_input_stream is_some, this could allow for use of
-        // crate::io::copy.
+        // TODO: this is skipping the wstd::io::copy optimization.
+        // in future, with another BodyInner variant for a boxed AsyncRead for
+        // which as_input_stream is_some, this could allow for use of
+        // crate::io::copy. But, we probably need to redesign AsyncRead to be
+        // a poll_read func in order to make it possible to use from
+        // http_body::Body::poll_frame.
         use futures_lite::stream::StreamExt;
         Body(BodyInner::Boxed(http_body_util::BodyExt::boxed_unsync(
             http_body_util::StreamBody::new(r.into_stream().map(|res| {

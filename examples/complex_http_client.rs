@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
     }
 
     let body = if args.body {
-        Body::from_input_stream(wstd::io::stdin().into_inner()).into_boxed_body()
+        Body::from_try_stream(wstd::io::stdin().into_inner().into_stream()).into_boxed_body()
     } else {
         Body::empty().into_boxed_body()
     };

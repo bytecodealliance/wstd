@@ -93,19 +93,18 @@ pub fn attr_macro_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```ignore
 /// #[wstd::http_server]
 /// async fn main(request: Request<Body>) -> Result<Response<Body>> {
-///     Ok(Response::new("Hello!\n".into_body()))
+///     Ok(Response::new("Hello!\n".into()))
 /// }
 /// ```
 #[proc_macro_attribute]
 pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 
-    if input.sig.asyncness.is_none() {
-        return quote_spanned! { input.sig.fn_token.span()=>
-            compile_error!("fn must be `async fn`");
-        }
-        .into();
-    }
+    let (run_async, run_await) = if input.sig.asyncness.is_some() {
+        (quote!(async), quote!(.await))
+    } else {
+        (quote!(), quote!())
+    };
 
     let output = &input.sig.output;
     let inputs = &input.sig.inputs;
@@ -130,14 +129,14 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
                 response_out: ::wstd::__internal::wasip2::http::types::ResponseOutparam
             ) {
                 #(#attrs)*
-                #vis async fn __run(#inputs) #output {
+                #vis #run_async fn __run(#inputs) #output {
                     #body
                 }
 
                 let responder = ::wstd::http::server::Responder::new(response_out);
                 ::wstd::runtime::block_on(async move {
                     match ::wstd::http::request::try_from_incoming(request) {
-                        Ok(request) => match __run(request).await {
+                        Ok(request) => match __run(request) #run_await {
                             Ok(response) => { responder.respond(response).await.unwrap() },
                             Err(err) => responder.fail(err).unwrap(),
                         }

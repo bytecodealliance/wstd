@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use futures_lite::stream::once_future;
 use http_body_util::{BodyExt, StreamBody};
+use std::convert::Infallible;
 use wstd::http::body::{Body, Bytes, Frame};
 use wstd::http::{Error, HeaderMap, Request, Response, StatusCode};
 use wstd::time::{Duration, Instant};
@@ -55,7 +56,7 @@ async fn http_wait_body(_request: Request<Body>) -> Result<Response<Body>> {
 
         // Compute how long we slept for.
         let elapsed = Instant::now().duration_since(now).as_millis();
-        Ok(Bytes::from(format!("slept for {elapsed} millis\n")))
+        Ok::<_, Infallible>(Bytes::from(format!("slept for {elapsed} millis\n")))
     };
 
     Ok(Response::new(Body::from_try_stream(once_future(body))))

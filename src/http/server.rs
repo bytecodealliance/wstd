@@ -8,7 +8,7 @@
 //! use wstd::http::{Request, Response, Body, Error};
 //! #[wstd::http_server]
 //! async fn main(_request: Request<Body>) -> Result<Response<Body>, Error> {
-//!     Ok(Response::new("Hello!\n".to_string().into()))
+//!     Ok(Response::new("Hello!\n".into()))
 //! }
 //! ```
 //!
@@ -26,6 +26,7 @@ use wasip2::http::types::OutgoingResponse;
 /// For use by the [`http_server`] macro only.
 ///
 /// [`http_server`]: crate::http_server
+#[doc(hidden)]
 #[must_use]
 pub struct Responder {
     outparam: ResponseOutparam,

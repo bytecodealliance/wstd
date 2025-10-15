@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
     // Send the request.
 
     let body = if args.body {
-        Body::from_input_stream(wstd::io::stdin().into_inner())
+        Body::from_try_stream(wstd::io::stdin().into_inner().into_stream())
     } else {
         Body::empty()
     };
