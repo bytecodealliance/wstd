@@ -1,9 +1,17 @@
+use std::io::ErrorKind;
+use std::net::{SocketAddr, ToSocketAddrs};
+use wasip2::sockets::instance_network::instance_network;
+use wasip2::sockets::network::Ipv4SocketAddress;
+use wasip2::sockets::tcp::{IpAddressFamily, IpSocketAddress};
+use wasip2::sockets::tcp_create_socket::create_tcp_socket;
 use wasip2::{
     io::streams::{InputStream, OutputStream},
     sockets::tcp::TcpSocket,
 };
 
+use super::to_io_err;
 use crate::io::{self, AsyncInputStream, AsyncOutputStream};
+use crate::runtime::AsyncPollable;
 
 /// A TCP stream between a local and a remote socket.
 pub struct TcpStream {
@@ -20,12 +28,61 @@ impl TcpStream {
             socket,
         }
     }
+
+    /// Opens a TCP connection to a remote host.
+    ///
+    /// `addr` is an address of the remote host. Anything which implements the
+    /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+    /// yields multiple addresses, connect will be attempted with each of the
+    /// addresses until a connection is successful. If none of the addresses
+    /// result in a successful connection, the error returned from the last
+    /// connection attempt (the last address) is returned.
+    pub async fn connect(addr: impl ToSocketAddrs) -> io::Result<Self> {
+        let addrs = addr.to_socket_addrs()?;
+        let mut last_err = None;
+        for addr in addrs {
+            match TcpStream::connect_addr(addr).await {
+                Ok(stream) => return Ok(stream),
+                Err(e) => last_err = Some(e),
+            }
+        }
+
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(ErrorKind::InvalidInput, "could not resolve to any address")
+        }))
+    }
+
+    /// Establishes a connection to the specified `addr`.
+    pub async fn connect_addr(addr: SocketAddr) -> io::Result<Self> {
+        let family = match addr {
+            SocketAddr::V4(_) => IpAddressFamily::Ipv4,
+            SocketAddr::V6(_) => IpAddressFamily::Ipv6,
+        };
+        let socket = create_tcp_socket(family).map_err(to_io_err)?;
+        let network = instance_network();
+
+        let remote_address = match addr {
+            SocketAddr::V4(addr) => {
+                let ip = addr.ip().octets();
+                let address = (ip[0], ip[1], ip[2], ip[3]);
+                let port = addr.port();
+                IpSocketAddress::Ipv4(Ipv4SocketAddress { port, address })
+            }
+            SocketAddr::V6(_) => todo!("IPv6 not yet supported in `wstd::net::TcpStream`"),
+        };
+        socket
+            .start_connect(&network, remote_address)
+            .map_err(to_io_err)?;
+        let pollable = AsyncPollable::new(socket.subscribe());
+        pollable.wait_for().await;
+        let (input, output) = socket.finish_connect().map_err(to_io_err)?;
+
+        Ok(TcpStream::new(input, output, socket))
+    }
+
     /// Returns the socket address of the remote peer of this TCP connection.
     pub fn peer_addr(&self) -> io::Result<String> {
-        let addr = self
-            .socket
-            .remote_address()
-            .map_err(super::tcp_listener::to_io_err)?;
+        let addr = self.socket.remote_address().map_err(to_io_err)?;
         Ok(format!("{addr:?}"))
     }
 
