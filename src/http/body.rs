@@ -40,8 +40,19 @@ pub mod util {
 ///   `Stream` of `Into<Bytes>`
 ///
 /// Consume this HTTP body using:
-///
-///
+/// * `Body::into_boxed_body` converts it to an `UnsyncBoxBody<Bytes, Error>`.
+///   This is a boxed representation of `http_body::Body` that is `Send` but not
+///   `Sync`. The Unsync variant is required for compatibility with the `axum`
+///   crate.
+/// * `async fn Body::contents(&mut self) -> Result<&[u8], Error>` is ready
+///   when all contents of the body have been collected, and gives them as a
+///   byte slice.
+/// * `async fn Body::str_contents(&mut self) -> Result<&str, Error>` is ready
+///   when all contents of the body have been collected, and gives them as a str
+///   slice.
+/// * `async fn Body::json(&mut self) -> Result<T, Error>` gathers body
+///   contents and then uses `T: serde::Deserialize` to deserialize to json
+///   (requires feature `json`).
 #[derive(Debug)]
 pub struct Body(BodyInner);
 

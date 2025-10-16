@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use futures_lite::stream::once_future;
+use futures_lite::stream::{once_future, unfold};
 use http_body_util::{BodyExt, StreamBody};
 use std::convert::Infallible;
 use wstd::http::body::{Body, Bytes, Frame};
@@ -14,6 +14,7 @@ async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
         "/" => http_home(request).await,
         "/wait-response" => http_wait_response(request).await,
         "/wait-body" => http_wait_body(request).await,
+        "/stream-body" => http_stream_body(request).await,
         "/echo" => http_echo(request).await,
         "/echo-headers" => http_echo_headers(request).await,
         "/echo-trailers" => http_echo_trailers(request).await,
@@ -60,6 +61,30 @@ async fn http_wait_body(_request: Request<Body>) -> Result<Response<Body>> {
     };
 
     Ok(Response::new(Body::from_try_stream(once_future(body))))
+}
+
+async fn http_stream_body(_request: Request<Body>) -> Result<Response<Body>> {
+    // Get the time now
+    let start = Instant::now();
+
+    let body = move |iters: usize| async move {
+        if iters == 0 {
+            return None;
+        }
+        // Sleep for 0.1 second.
+        wstd::task::sleep(Duration::from_millis(100)).await;
+
+        // Compute how long we slept for.
+        let elapsed = Instant::now().duration_since(start).as_millis();
+        Some((
+            Ok::<_, Infallible>(Bytes::from(format!(
+                "stream started {elapsed} millis ago\n"
+            ))),
+            iters - 1,
+        ))
+    };
+
+    Ok(Response::new(Body::from_try_stream(unfold(5, body))))
 }
 
 async fn http_echo(request: Request<Body>) -> Result<Response<Body>> {

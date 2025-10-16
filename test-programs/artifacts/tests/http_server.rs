@@ -81,6 +81,31 @@ fn http_server() -> Result<()> {
     );
     assert!(duration >= Duration::from_secs(1));
 
+    // TEST /stream-body http_stream_body
+    // Sends response status and headers, then unfolds 5 iterations of a
+    // stream that sleeps for 100ms and then prints the time since stream
+    // started.
+    // With ureq we can't tell that the response status and headers were sent
+    // with a delay in the body. Additionally, the implementation MAY buffer up the
+    // entire response and body before sending it, though wasmtime does not.
+    let start = Instant::now();
+    let body: String = ureq::get("http://127.0.0.1:8081/stream-body")
+        .call()?
+        .into_string()?;
+    let duration = start.elapsed();
+    assert_eq!(body.lines().count(), 5, "body has 5 lines");
+    for (iter, line) in body.lines().enumerate() {
+        let sleep_report = line
+            .split(' ')
+            .find_map(|s| s.parse::<usize>().ok())
+            .expect("body should print 'stream started Nxx millis ago'");
+        assert!(
+            sleep_report >= (iter * 100),
+            "should have slept for {iter} * 100 or more millis, got {sleep_report}"
+        );
+    }
+    assert!(duration >= Duration::from_millis(500));
+
     // TEST /echo htto_echo
     // Send a request body, see that we got the same back in response body.
     const MESSAGE: &[u8] = b"hello, echoserver!\n";
