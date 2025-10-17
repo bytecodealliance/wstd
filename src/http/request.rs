@@ -1,10 +1,10 @@
 use super::{
+    Authority, HeaderMap, PathAndQuery, Uri,
     body::{Body, BodyHint},
     error::{Context, Error, ErrorCode},
     fields::{header_map_from_wasi, header_map_to_wasi},
     method::{from_wasi_method, to_wasi_method},
     scheme::{from_wasi_scheme, to_wasi_scheme},
-    Authority, HeaderMap, PathAndQuery, Uri,
 };
 use wasip2::http::outgoing_handler::OutgoingRequest;
 use wasip2::http::types::IncomingRequest;

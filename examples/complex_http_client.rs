@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
 use std::str::FromStr;
 use wstd::http::{Body, BodyExt, Client, HeaderMap, HeaderName, HeaderValue, Method, Request, Uri};
@@ -91,13 +91,7 @@ async fn main() -> Result<()> {
         Body::empty().into_boxed_body()
     };
     let t = trailers.clone();
-    let body = body.with_trailers(async move {
-        if t.is_empty() {
-            None
-        } else {
-            Some(Ok(t))
-        }
-    });
+    let body = body.with_trailers(async move { if t.is_empty() { None } else { Some(Ok(t)) } });
     let request = request.body(Body::from_http_body(body))?;
 
     // Send the request.

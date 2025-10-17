@@ -1,7 +1,7 @@
 use crate::http::{
+    Error, HeaderMap,
     error::Context as _,
     fields::{header_map_from_wasi, header_map_to_wasi},
-    Error, HeaderMap,
 };
 use crate::io::{AsyncInputStream, AsyncOutputStream};
 use crate::runtime::{AsyncPollable, Reactor, WaitFor};
@@ -10,10 +10,10 @@ pub use ::http_body::{Body as HttpBody, Frame, SizeHint};
 pub use bytes::Bytes;
 
 use http::header::CONTENT_LENGTH;
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use std::fmt;
-use std::future::{poll_fn, Future};
-use std::pin::{pin, Pin};
+use std::future::{Future, poll_fn};
+use std::pin::{Pin, pin};
 use std::task::{Context, Poll};
 use wasip2::http::types::{
     FutureTrailers, IncomingBody as WasiIncomingBody, OutgoingBody as WasiOutgoingBody,
@@ -145,7 +145,7 @@ impl Body {
     /// copied into memory, or an error occurs.
     pub async fn contents(&mut self) -> Result<&[u8], Error> {
         match &mut self.0 {
-            BodyInner::Complete { ref data, .. } => Ok(data.as_ref()),
+            BodyInner::Complete { data, .. } => Ok(&*data),
             inner => {
                 let mut prev = BodyInner::Complete {
                     data: Bytes::new(),
@@ -164,7 +164,7 @@ impl Body {
                     trailers,
                 };
                 Ok(match inner {
-                    BodyInner::Complete { ref data, .. } => data.as_ref(),
+                    BodyInner::Complete { data, .. } => &*data,
                     _ => unreachable!(),
                 })
             }
@@ -511,13 +511,13 @@ impl BodyState {
         loop {
             match self.stream.read(MAX_FRAME_SIZE) {
                 Ok(bs) if !bs.is_empty() => {
-                    return Poll::Ready(Some(Ok(Frame::data(Bytes::from(bs)))))
+                    return Poll::Ready(Some(Ok(Frame::data(Bytes::from(bs)))));
                 }
                 Err(StreamError::Closed) => return Poll::Ready(None),
                 Err(StreamError::LastOperationFailed(err)) => {
                     return Poll::Ready(Some(Err(
                         Error::msg(err.to_debug_string()).context("reading incoming body stream")
-                    )))
+                    )));
                 }
                 Ok(_empty) => {
                     if self.subscription.is_none() {

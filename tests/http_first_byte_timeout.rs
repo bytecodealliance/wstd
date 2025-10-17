@@ -1,4 +1,4 @@
-use wstd::http::{error::ErrorCode, Body, Client, Request};
+use wstd::http::{Body, Client, Request, error::ErrorCode};
 
 #[wstd::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

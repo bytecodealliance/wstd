@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
 use wstd::http::{Body, BodyExt, Client, Method, Request, Uri};
 use wstd::io::AsyncWrite;

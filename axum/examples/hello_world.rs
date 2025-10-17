@@ -5,7 +5,7 @@
 //! wasmtime serve -Scli target/wasm32-wasip2/debug/examples/hello-world.wasm
 //! ```
 
-use axum::{response::Html, routing::get, Router};
+use axum::{Router, response::Html, routing::get};
 
 #[wstd_axum::http_server]
 fn main() -> Router {
