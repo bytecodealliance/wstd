@@ -23,7 +23,7 @@ fn http_server() -> Result<()> {
             .arg("serve")
             .arg("-Scli")
             .arg("--addr=127.0.0.1:8081")
-            .arg(test_programs_artifacts::HTTP_SERVER)
+            .arg(test_programs::HTTP_SERVER)
             .spawn()?,
     );
 

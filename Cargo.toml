@@ -50,7 +50,6 @@ members = [
     "axum/macro",
     "macro",
     "test-programs",
-    "test-programs/artifacts",
 ]
 resolver = "2"
 
@@ -94,7 +93,6 @@ slab = "0.4.9"
 syn = "2.0"
 test-log = { version = "0.2", features = ["trace"] }
 test-programs = { path = "test-programs" }
-test-programs-artifacts = { path = "test-programs/artifacts" }
 tower-service = "0.3.3"
 ureq = { version = "2.12.1", default-features = false }
 wasip2 = "1.0"
