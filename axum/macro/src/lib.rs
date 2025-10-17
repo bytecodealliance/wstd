@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{ItemFn, parse_macro_input, spanned::Spanned};
+use syn::{parse_macro_input, spanned::Spanned, ItemFn};
 
 #[proc_macro_attribute]
 pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStream {

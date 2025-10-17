@@ -1,11 +1,11 @@
 //! Run with
 //!
 //! ```sh
-//! cargo build -p example-hello-world --target wasm32-wasip2
-//! wasmtime serve -Scli target/wasm32-wasip2/debug/example-hello-world.wasm
+//! cargo build -p wstd-axum --examples --target wasm32-wasip2
+//! wasmtime serve -Scli target/wasm32-wasip2/debug/examples/hello-world.wasm
 //! ```
 
-use axum::{Router, response::Html, routing::get};
+use axum::{response::Html, routing::get, Router};
 
 #[wstd_axum::http_server]
 fn main() -> Router {
