@@ -46,6 +46,8 @@ serde_json.workspace = true
 
 [workspace]
 members = [
+    "axum",
+    "axum/macro",
     "macro",
     "test-programs",
     "test-programs/artifacts",
@@ -71,6 +73,7 @@ authors = [
 anyhow = "1"
 async-task = "4.7"
 async-trait = "*"
+axum = { version = "0.8.6", default-features = false }
 bytes = "1.10.1"
 cargo_metadata = "0.22"
 clap = { version = "4.5.26", features = ["derive"] }
@@ -92,10 +95,13 @@ syn = "2.0"
 test-log = { version = "0.2", features = ["trace"] }
 test-programs = { path = "test-programs" }
 test-programs-artifacts = { path = "test-programs/artifacts" }
+tower-service = "0.3.3"
 ureq = { version = "2.12.1", default-features = false }
 wasip2 = "1.0"
 wstd = { path = "." }
-wstd-macro = { path = "macro", version = "=0.5.6" }
+wstd-axum = { path = "./axum", version = "0.5.6" }
+wstd-axum-macro = { path = "./axum/macro", version = "=0.5.6" }
+wstd-macro = { path = "./macro", version = "=0.5.6" }
 
 [package.metadata.docs.rs]
 all-features = true
