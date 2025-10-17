@@ -14,7 +14,18 @@ impl Drop for DontOrphan {
 }
 
 #[test_log::test]
-fn http_server() -> Result<()> {
+fn hello_world() -> Result<()> {
+    run(test_programs::axum::HELLO_WORLD)
+}
+
+#[test_log::test]
+fn hello_world_nomacro() -> Result<()> {
+    run(test_programs::axum::HELLO_WORLD_NOMACRO)
+}
+
+// The hello_world.rs and hello_world_nomacro.rs are identical in
+// functionality
+fn run(guest: &str) -> Result<()> {
     // Run wasmtime serve.
     // Enable -Scli because we currently don't have a way to build with the
     // proxy adapter, so we build with the default adapter.
@@ -23,7 +34,7 @@ fn http_server() -> Result<()> {
             .arg("serve")
             .arg("-Scli")
             .arg("--addr=127.0.0.1:8081")
-            .arg(test_programs::axum::HELLO_WORLD)
+            .arg(guest)
             .spawn()?,
     );
 
