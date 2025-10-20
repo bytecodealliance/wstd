@@ -15,3 +15,10 @@ axum.workspace = true
 tower-service.workspace = true
 wstd.workspace = true
 wstd-axum-macro.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+futures-concurrency.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_qs.workspace = true
+axum = { workspace = true, features = ["query", "json", "macros"] }
