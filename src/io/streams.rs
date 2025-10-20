@@ -73,6 +73,24 @@ impl AsyncInputStream {
         Ok(len)
     }
 
+    /// Move the entire contents of an input stream directly into an output
+    /// stream, until the input stream has closed. This operation is optimized
+    /// to avoid copying stream contents into and out of memory.
+    pub async fn forward(&self, writer: &AsyncOutputStream) -> std::io::Result<u64> {
+        let mut written = 0;
+        loop {
+            self.ready().await;
+            writer.ready().await;
+            match writer.stream.splice(&self.stream, u64::MAX) {
+                Ok(n) => written += n,
+                Err(StreamError::Closed) => break Ok(written),
+                Err(StreamError::LastOperationFailed(err)) => {
+                    break Err(std::io::Error::other(err.to_debug_string()));
+                }
+            }
+        }
+    }
+
     /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most 8k. If you want to control chunk size, use
@@ -274,6 +292,20 @@ impl AsyncOutputStream {
             }
         }
     }
+
+    /// Asynchronously write to the output stream. This method is the same as
+    /// [`AsyncWrite::write_all`], but doesn't require a `&mut self`.
+    pub async fn write_all(&self, buf: &[u8]) -> std::io::Result<()> {
+        let mut to_write = &buf[0..];
+        loop {
+            let bytes_written = self.write(to_write).await?;
+            to_write = &to_write[bytes_written..];
+            if to_write.is_empty() {
+                return Ok(());
+            }
+        }
+    }
+
     /// Asyncronously flush the output stream. Initiates a flush, and then
     /// awaits until the flush is complete and the output stream is ready for
     /// writing again.
@@ -315,17 +347,4 @@ impl AsyncWrite for AsyncOutputStream {
     fn as_async_output_stream(&self) -> Option<&AsyncOutputStream> {
         Some(self)
     }
-}
-
-/// Wait for both streams to be ready and then do a WASI splice.
-pub(crate) async fn splice(
-    reader: &AsyncInputStream,
-    writer: &AsyncOutputStream,
-    len: u64,
-) -> Result<u64, StreamError> {
-    // Wait for both streams to be ready.
-    reader.ready().await;
-    writer.ready().await;
-
-    writer.stream.splice(&reader.stream, len)
 }

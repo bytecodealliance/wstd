@@ -3,7 +3,7 @@ use crate::http::{
     fields::{header_map_from_wasi, header_map_to_wasi},
     Error, HeaderMap,
 };
-use crate::io::{AsyncInputStream, AsyncOutputStream, AsyncWrite};
+use crate::io::{AsyncInputStream, AsyncOutputStream};
 use crate::runtime::{AsyncPollable, Reactor, WaitFor};
 
 pub use ::http_body::{Body as HttpBody, Frame, SizeHint};
@@ -74,7 +74,7 @@ impl Body {
         match self.0 {
             BodyInner::Incoming(incoming) => incoming.send(outgoing_body).await,
             BodyInner::Boxed(box_body) => {
-                let mut out_stream = AsyncOutputStream::new(
+                let out_stream = AsyncOutputStream::new(
                     outgoing_body
                         .write()
                         .expect("outgoing body already written"),
@@ -105,7 +105,7 @@ impl Body {
                 }
             }
             BodyInner::Complete { data, trailers } => {
-                let mut out_stream = AsyncOutputStream::new(
+                let out_stream = AsyncOutputStream::new(
                     outgoing_body
                         .write()
                         .expect("outgoing body already written"),
@@ -335,18 +335,16 @@ impl Incoming {
     }
     async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
         let in_body = self.body;
-        let mut in_stream =
+        let in_stream =
             AsyncInputStream::new(in_body.stream().expect("incoming body already read"));
-        let mut out_stream = AsyncOutputStream::new(
+        let out_stream = AsyncOutputStream::new(
             outgoing_body
                 .write()
                 .expect("outgoing body already written"),
         );
-        crate::io::copy(&mut in_stream, &mut out_stream)
-            .await
-            .map_err(|e| {
-                Error::from(e).context("copying incoming body stream to outgoing body stream")
-            })?;
+        in_stream.forward(&out_stream).await.map_err(|e| {
+            Error::from(e).context("copying incoming body stream to outgoing body stream")
+        })?;
         drop(in_stream);
         drop(out_stream);
         let future_in_trailers = WasiIncomingBody::finish(in_body);

@@ -1,5 +1,4 @@
-use crate::io::{AsyncRead, AsyncWrite, Error};
-use wasip2::io::streams::StreamError;
+use crate::io::{AsyncRead, AsyncWrite};
 
 /// Copy bytes from a reader to a writer.
 pub async fn copy<R, W>(mut reader: R, mut writer: W) -> crate::io::Result<()>
@@ -11,15 +10,8 @@ where
     // `AsyncOutputStream`.
     if let Some(reader) = reader.as_async_input_stream() {
         if let Some(writer) = writer.as_async_output_stream() {
-            loop {
-                match super::splice(reader, writer, u64::MAX).await {
-                    Ok(_n) => (),
-                    Err(StreamError::Closed) => return Ok(()),
-                    Err(StreamError::LastOperationFailed(err)) => {
-                        return Err(Error::other(err.to_debug_string()));
-                    }
-                }
-            }
+            reader.forward(writer).await?;
+            return Ok(());
         }
     }
 
