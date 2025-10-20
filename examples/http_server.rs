@@ -122,9 +122,11 @@ async fn http_response_status(request: Request<Body>) -> Result<Response<Body>> 
     } else {
         500
     };
-    Ok(Response::builder()
-        .status(status)
-        .body(String::new().into())?)
+    let mut response = Response::builder().status(status);
+    if status == 302 {
+        response = response.header("Location", "http://localhost/response-status");
+    }
+    Ok(response.body(String::new().into())?)
 }
 
 async fn http_response_fail(_request: Request<Body>) -> Result<Response<Body>> {
