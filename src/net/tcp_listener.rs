@@ -1,12 +1,11 @@
 use wasip2::sockets::network::Ipv4SocketAddress;
-use wasip2::sockets::tcp::{ErrorCode, IpAddressFamily, IpSocketAddress, TcpSocket};
+use wasip2::sockets::tcp::{IpAddressFamily, IpSocketAddress, TcpSocket};
 
 use crate::io;
 use crate::iter::AsyncIterator;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 
-use super::TcpStream;
+use super::{to_io_err, TcpStream};
 use crate::runtime::AsyncPollable;
 
 /// A TCP socket server, listening for connections.
@@ -78,29 +77,6 @@ impl<'a> AsyncIterator for Incoming<'a> {
             Err(err) => return Some(Err(err)),
         };
         Some(Ok(TcpStream::new(input, output, socket)))
-    }
-}
-
-pub(super) fn to_io_err(err: ErrorCode) -> io::Error {
-    match err {
-        wasip2::sockets::network::ErrorCode::Unknown => ErrorKind::Other.into(),
-        wasip2::sockets::network::ErrorCode::AccessDenied => ErrorKind::PermissionDenied.into(),
-        wasip2::sockets::network::ErrorCode::NotSupported => ErrorKind::Unsupported.into(),
-        wasip2::sockets::network::ErrorCode::InvalidArgument => ErrorKind::InvalidInput.into(),
-        wasip2::sockets::network::ErrorCode::OutOfMemory => ErrorKind::OutOfMemory.into(),
-        wasip2::sockets::network::ErrorCode::Timeout => ErrorKind::TimedOut.into(),
-        wasip2::sockets::network::ErrorCode::WouldBlock => ErrorKind::WouldBlock.into(),
-        wasip2::sockets::network::ErrorCode::InvalidState => ErrorKind::InvalidData.into(),
-        wasip2::sockets::network::ErrorCode::AddressInUse => ErrorKind::AddrInUse.into(),
-        wasip2::sockets::network::ErrorCode::ConnectionRefused => {
-            ErrorKind::ConnectionRefused.into()
-        }
-        wasip2::sockets::network::ErrorCode::ConnectionReset => ErrorKind::ConnectionReset.into(),
-        wasip2::sockets::network::ErrorCode::ConnectionAborted => {
-            ErrorKind::ConnectionAborted.into()
-        }
-        wasip2::sockets::network::ErrorCode::ConcurrencyConflict => ErrorKind::AlreadyExists.into(),
-        _ => ErrorKind::Other.into(),
     }
 }
 
