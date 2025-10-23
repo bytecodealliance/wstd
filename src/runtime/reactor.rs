@@ -38,8 +38,6 @@ impl AsyncPollable {
     pub fn new(pollable: Pollable) -> Self {
         Reactor::current().schedule(pollable)
     }
-    // TODO: can I instead return a Pin<&mut WaitFor> here? so we dont keep
-    // recreating this.
     /// Create a Future that waits for the Pollable's readiness.
     pub fn wait_for(&self) -> WaitFor {
         use std::sync::atomic::{AtomicU64, Ordering};
