@@ -30,7 +30,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: check
-        args: --all --bins --examples
+        args: --workspace --all --bins --examples
 
     - name: wstd tests
       uses: actions-rs/cargo@v1
@@ -42,7 +42,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: -p test-programs-artifacts -- --nocapture
+        args: -p test-programs -- --nocapture
 
 
   check_fmt_and_docs:

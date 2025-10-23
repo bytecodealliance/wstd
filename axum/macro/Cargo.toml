@@ -1,0 +1,18 @@
+[package]
+name = "wstd-axum-macro"
+description = "Proc-macro support for axum as a wasi http server via wstd"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { workspace = true, features = ["full"] }
+quote.workspace = true

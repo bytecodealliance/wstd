@@ -6,14 +6,14 @@ fn tcp_echo_server() -> Result<()> {
     use std::io::{Read, Write};
     use std::net::{Shutdown, TcpStream};
 
-    println!("testing {}", test_programs_artifacts::TCP_ECHO_SERVER);
+    println!("testing {}", test_programs::TCP_ECHO_SERVER);
 
     // Run the component in wasmtime
     // -Sinherit-network required for sockets to work
     let mut wasmtime_process = Command::new("wasmtime")
         .arg("run")
         .arg("-Sinherit-network")
-        .arg(test_programs_artifacts::TCP_ECHO_SERVER)
+        .arg(test_programs::TCP_ECHO_SERVER)
         .stdout(std::process::Stdio::piped())
         .spawn()?;
 

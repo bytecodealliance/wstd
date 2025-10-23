@@ -1,6 +1,6 @@
 use super::{AsyncPollable, AsyncRead, AsyncWrite};
 use crate::runtime::WaitFor;
-use std::future::{poll_fn, Future};
+use std::future::{Future, poll_fn};
 use std::pin::Pin;
 use std::sync::{Mutex, OnceLock};
 use std::task::{Context, Poll};
@@ -64,7 +64,7 @@ impl AsyncInputStream {
                 // 0 bytes from Rust's `read` means end-of-stream.
                 Err(StreamError::Closed) => return Ok(0),
                 Err(StreamError::LastOperationFailed(err)) => {
-                    return Err(std::io::Error::other(err.to_debug_string()))
+                    return Err(std::io::Error::other(err.to_debug_string()));
                 }
             }
         };
@@ -263,18 +263,18 @@ impl AsyncOutputStream {
                     match self.stream.write(&buf[0..writable]) {
                         Ok(()) => return Ok(writable),
                         Err(StreamError::Closed) => {
-                            return Err(std::io::Error::from(std::io::ErrorKind::ConnectionReset))
+                            return Err(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
                         }
                         Err(StreamError::LastOperationFailed(err)) => {
-                            return Err(std::io::Error::other(err.to_debug_string()))
+                            return Err(std::io::Error::other(err.to_debug_string()));
                         }
                     }
                 }
                 Err(StreamError::Closed) => {
-                    return Err(std::io::Error::from(std::io::ErrorKind::ConnectionReset))
+                    return Err(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
                 }
                 Err(StreamError::LastOperationFailed(err)) => {
-                    return Err(std::io::Error::other(err.to_debug_string()))
+                    return Err(std::io::Error::other(err.to_debug_string()));
                 }
             }
         }

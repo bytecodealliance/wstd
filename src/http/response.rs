@@ -3,7 +3,7 @@ use wasip2::http::types::IncomingResponse;
 
 use crate::http::body::{Body, BodyHint};
 use crate::http::error::{Context, Error};
-use crate::http::fields::{header_map_from_wasi, HeaderMap};
+use crate::http::fields::{HeaderMap, header_map_from_wasi};
 
 pub use http::response::{Builder, Response};
 

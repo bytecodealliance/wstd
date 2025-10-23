@@ -1,14 +1,17 @@
 [package]
 name = "test-programs"
 version = "0.1.0"
-publish = false
-license.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
+publish = false
 
-[dependencies]
+[dev-dependencies]
 anyhow.workspace = true
-futures-lite.workspace = true
-http-body-util.workspace = true
+test-log.workspace = true
 serde_json.workspace = true
-wstd.workspace = true
+ureq.workspace = true
+
+[build-dependencies]
+cargo_metadata.workspace = true
+heck.workspace = true

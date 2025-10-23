@@ -16,7 +16,7 @@ use std::thread;
 use std::time::Duration;
 
 // note that this list must be topologically sorted by dependencies
-const CRATES_TO_PUBLISH: &[&str] = &["wstd-macro", "wstd"];
+const CRATES_TO_PUBLISH: &[&str] = &["wstd-macro", "wstd", "wstd-axum-macro", "wstd-axum"];
 
 #[derive(Debug)]
 struct Workspace {

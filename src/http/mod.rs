@@ -4,7 +4,7 @@ pub use http::status::StatusCode;
 pub use http::uri::{Authority, PathAndQuery, Uri};
 
 #[doc(inline)]
-pub use body::{util::BodyExt, Body};
+pub use body::{Body, util::BodyExt};
 pub use client::Client;
 pub use error::{Error, ErrorCode, Result};
 pub use fields::{HeaderMap, HeaderName, HeaderValue};

@@ -46,21 +46,22 @@ serde_json.workspace = true
 
 [workspace]
 members = [
+    "axum",
+    "axum/macro",
     "macro",
     "test-programs",
-    "test-programs/artifacts",
 ]
 resolver = "2"
 
 [workspace.package]
 version = "0.5.6"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/bytecodealliance/wstd"
 keywords = ["WebAssembly", "async", "stdlib", "Components"]
 categories = ["wasm", "asynchronous"]
 # Rust-version policy: stable N-2, same as wasmtime.
-rust-version = "1.87"
+rust-version = "1.89"
 authors = [
     "Yoshua Wuyts <rust@yosh.is>",
     "Pat Hickey <pat@moreproductive.org>",
@@ -71,6 +72,7 @@ authors = [
 anyhow = "1"
 async-task = "4.7"
 async-trait = "*"
+axum = { version = "0.8.6", default-features = false }
 bytes = "1.10.1"
 cargo_metadata = "0.22"
 clap = { version = "4.5.26", features = ["derive"] }
@@ -87,15 +89,18 @@ pin-project-lite = "0.2.8"
 quote = "1.0"
 serde= "1"
 serde_json = "1"
+serde_qs = "0.15"
 slab = "0.4.9"
 syn = "2.0"
 test-log = { version = "0.2", features = ["trace"] }
 test-programs = { path = "test-programs" }
-test-programs-artifacts = { path = "test-programs/artifacts" }
-ureq = { version = "2.12.1", default-features = false }
+tower-service = "0.3.3"
+ureq = { version = "3.1", default-features = false, features = ["json"] }
 wasip2 = "1.0"
-wstd = { path = "." }
-wstd-macro = { path = "macro", version = "=0.5.6" }
+wstd = { path = ".", version = "=0.5.6" }
+wstd-axum = { path = "./axum", version = "=0.5.6" }
+wstd-axum-macro = { path = "./axum/macro", version = "=0.5.6" }
+wstd-macro = { path = "./macro", version = "=0.5.6" }
 
 [package.metadata.docs.rs]
 all-features = true

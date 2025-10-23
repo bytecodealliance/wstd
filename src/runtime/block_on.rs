@@ -1,4 +1,4 @@
-use super::{Reactor, REACTOR};
+use super::{REACTOR, Reactor};
 
 use std::future::Future;
 use std::pin::pin;

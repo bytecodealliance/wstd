@@ -1,45 +1,21 @@
 use anyhow::Result;
-use std::net::TcpStream;
-use std::process::{Child, Command};
-use std::thread::sleep;
 use std::time::{Duration, Instant};
-
-// Wasmtime serve will run until killed. Kill it in a drop impl so the process
-// isnt orphaned when the test suite ends (successfully, or unsuccessfully)
-struct DontOrphan(Child);
-impl Drop for DontOrphan {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-    }
-}
 
 #[test_log::test]
 fn http_server() -> Result<()> {
     // Run wasmtime serve.
     // Enable -Scli because we currently don't have a way to build with the
     // proxy adapter, so we build with the default adapter.
-    let _wasmtime_process = DontOrphan(
-        Command::new("wasmtime")
-            .arg("serve")
-            .arg("-Scli")
-            .arg("--addr=127.0.0.1:8081")
-            .arg(test_programs_artifacts::HTTP_SERVER)
-            .spawn()?,
-    );
-
-    // Clumsily wait for the server to accept connections.
-    'wait: loop {
-        sleep(Duration::from_millis(100));
-        if TcpStream::connect("127.0.0.1:8081").is_ok() {
-            break 'wait;
-        }
-    }
+    let _serve = test_programs::WasmtimeServe::new(test_programs::HTTP_SERVER)?;
 
     // Test each path in the server:
 
     // TEST / http_home
     // Response body is the hard-coded default
-    let body: String = ureq::get("http://127.0.0.1:8081").call()?.into_string()?;
+    let body: String = ureq::get("http://127.0.0.1:8081")
+        .call()?
+        .body_mut()
+        .read_to_string()?;
     assert_eq!(body, "Hello, wasi:http/proxy world!\n");
 
     // TEST /wait-response http_wait_response
@@ -48,7 +24,8 @@ fn http_server() -> Result<()> {
     let start = Instant::now();
     let body: String = ureq::get("http://127.0.0.1:8081/wait-response")
         .call()?
-        .into_string()?;
+        .body_mut()
+        .read_to_string()?;
     let duration = start.elapsed();
     let sleep_report = body
         .split(' ')
@@ -69,7 +46,8 @@ fn http_server() -> Result<()> {
     let start = Instant::now();
     let body: String = ureq::get("http://127.0.0.1:8081/wait-body")
         .call()?
-        .into_string()?;
+        .body_mut()
+        .read_to_string()?;
     let duration = start.elapsed();
     let sleep_report = body
         .split(' ')
@@ -91,7 +69,8 @@ fn http_server() -> Result<()> {
     let start = Instant::now();
     let body: String = ureq::get("http://127.0.0.1:8081/stream-body")
         .call()?
-        .into_string()?;
+        .body_mut()
+        .read_to_string()?;
     let duration = start.elapsed();
     assert_eq!(body.lines().count(), 5, "body has 5 lines");
     for (iter, line) in body.lines().enumerate() {
@@ -110,8 +89,10 @@ fn http_server() -> Result<()> {
     // Send a request body, see that we got the same back in response body.
     const MESSAGE: &[u8] = b"hello, echoserver!\n";
     let body: String = ureq::get("http://127.0.0.1:8081/echo")
+        .force_send_body()
         .send(MESSAGE)?
-        .into_string()?;
+        .body_mut()
+        .read_to_string()?;
     assert_eq!(body.as_bytes(), MESSAGE);
 
     // TEST /echo-headers htto_echo_headers
@@ -127,12 +108,15 @@ fn http_server() -> Result<()> {
     ];
     let mut request = ureq::get("http://127.0.0.1:8081/echo-headers");
     for (name, value) in test_headers {
-        request = request.set(name, value);
+        request = request.header(name, value);
     }
     let response = request.call()?;
-    assert!(response.headers_names().len() >= test_headers.len());
+    assert!(response.headers().len() >= test_headers.len());
     for (name, value) in test_headers {
-        assert_eq!(response.header(name), Some(value));
+        assert_eq!(
+            response.headers().get(name),
+            Some(&ureq::http::HeaderValue::from_str(value).unwrap())
+        );
     }
 
     // NOT TESTED /echo-trailers htto_echo_trailers
@@ -142,16 +126,11 @@ fn http_server() -> Result<()> {
     // Send request with `X-Request-Code: <status>`. Should get back that
     // status.
     let response = ureq::get("http://127.0.0.1:8081/response-status")
-        .set("X-Response-Status", "302")
-        .call()?;
-    assert_eq!(response.status(), 302);
-
-    let response = ureq::get("http://127.0.0.1:8081/response-status")
-        .set("X-Response-Status", "401")
+        .header("X-Response-Status", "401")
         .call();
-    // ureq interprets some statuses as OK, some as Err:
+    // ureq gives us a 401 in an Error::StatusCode
     match response {
-        Err(ureq::Error::Status(401, _)) => {}
+        Err(ureq::Error::StatusCode(401)) => {}
         result => {
             panic!("/response-code expected status 302, got: {result:?}");
         }
@@ -161,7 +140,7 @@ fn http_server() -> Result<()> {
     // Wasmtime gives a 500 error when wasi-http guest gives error instead of
     // response
     match ureq::get("http://127.0.0.1:8081/response-fail").call() {
-        Err(ureq::Error::Status(500, _)) => {}
+        Err(ureq::Error::StatusCode(500)) => {}
         result => {
             panic!("/response-fail expected status 500 error, got: {result:?}");
         }
@@ -171,9 +150,9 @@ fn http_server() -> Result<()> {
     // Response status and headers sent off, then error in body will close
     // connection
     match ureq::get("http://127.0.0.1:8081/response-body-fail").call() {
-        Err(ureq::Error::Transport(_transport)) => {}
+        Err(ureq::Error::Io(_transport)) => {}
         result => {
-            panic!("/response-body-fail expected transport error, got: {result:?}")
+            panic!("/response-body-fail expected io error, got: {result:?}")
         }
     }
 

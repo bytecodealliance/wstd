@@ -5,7 +5,7 @@ use crate::io;
 use crate::iter::AsyncIterator;
 use std::net::SocketAddr;
 
-use super::{to_io_err, TcpStream};
+use super::{TcpStream, to_io_err};
 use crate::runtime::AsyncPollable;
 
 /// A TCP socket server, listening for connections.
