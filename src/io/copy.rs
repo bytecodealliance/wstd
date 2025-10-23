@@ -8,11 +8,11 @@ where
 {
     // Optimized path when we have an `AsyncInputStream` and an
     // `AsyncOutputStream`.
-    if let Some(reader) = reader.as_async_input_stream() {
-        if let Some(writer) = writer.as_async_output_stream() {
-            reader.copy_to(writer).await?;
-            return Ok(());
-        }
+    if let Some(reader) = reader.as_async_input_stream()
+        && let Some(writer) = writer.as_async_output_stream()
+    {
+        reader.copy_to(writer).await?;
+        return Ok(());
     }
 
     // Unoptimized case: read the input and then write it.
