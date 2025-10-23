@@ -1,10 +1,7 @@
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
-use wstd::http::{
-    body::{IncomingBody, StreamedBody},
-    request::Builder,
-    Body, Client, Method, Request, Response, Uri,
-};
+use wstd::http::{Body, BodyExt, Client, Method, Request, Uri};
+use wstd::io::AsyncWrite;
 
 /// Simple HTTP client
 ///
@@ -75,39 +72,35 @@ async fn main() -> Result<()> {
 
     // Send the request.
 
-    async fn send_request<B: Body>(
-        client: &Client,
-        request: Builder,
-        body: B,
-    ) -> Result<Response<IncomingBody>> {
-        let request = request.body(body)?;
-
-        eprintln!("> {} / {:?}", request.method(), request.version());
-        for (key, value) in request.headers().iter() {
-            let value = String::from_utf8_lossy(value.as_bytes());
-            eprintln!("> {key}: {value}");
-        }
-
-        Ok(client.send(request).await?)
-    }
-    let response = if args.body {
-        send_request(&client, request, StreamedBody::new(wstd::io::stdin())).await
+    let body = if args.body {
+        Body::from_try_stream(wstd::io::stdin().into_inner().into_stream())
     } else {
-        send_request(&client, request, wstd::io::empty()).await
-    }?;
+        Body::empty()
+    };
+
+    let request = request.body(body)?;
+
+    eprintln!("> {} / {:?}", request.method(), request.version());
+    for (key, value) in request.headers().iter() {
+        let value = String::from_utf8_lossy(value.as_bytes());
+        eprintln!("> {key}: {value}");
+    }
+
+    let response = client.send(request).await?;
 
     // Print the response.
-
     eprintln!("< {:?} {}", response.version(), response.status());
     for (key, value) in response.headers().iter() {
         let value = String::from_utf8_lossy(value.as_bytes());
         eprintln!("< {key}: {value}");
     }
 
-    let mut body = response.into_body();
-    wstd::io::copy(&mut body, wstd::io::stdout()).await?;
+    let body = response.into_body().into_boxed_body().collect().await?;
+    let trailers = body.trailers().cloned();
+    wstd::io::stdout()
+        .write_all(body.to_bytes().as_ref())
+        .await?;
 
-    let trailers = body.finish().await?;
     if let Some(trailers) = trailers {
         for (key, value) in trailers.iter() {
             let value = String::from_utf8_lossy(value.as_bytes());

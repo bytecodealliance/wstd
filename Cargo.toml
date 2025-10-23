@@ -17,8 +17,13 @@ default = ["json"]
 json = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
+anyhow.workspace = true
 async-task.workspace = true
-futures-core.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+futures-lite.workspace = true
+http-body-util.workspace = true
+http-body.workspace = true
 http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
@@ -33,7 +38,7 @@ serde_json = { workspace = true, optional = true }
 [dev-dependencies]
 anyhow.workspace = true
 clap.workspace = true
-futures-lite.workspace = true
+http-body-util.workspace = true
 futures-concurrency.workspace = true
 humantime.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -65,6 +70,8 @@ authors = [
 [workspace.dependencies]
 anyhow = "1"
 async-task = "4.7"
+async-trait = "*"
+bytes = "1.10.1"
 cargo_metadata = "0.22"
 clap = { version = "4.5.26", features = ["derive"] }
 futures-core = "0.3.19"
@@ -73,6 +80,8 @@ futures-concurrency = "7.6"
 humantime = "2.1.0"
 heck = "0.5"
 http = "1.1"
+http-body = "1.0.1"
+http-body-util = "0.1.3"
 itoa = "1"
 pin-project-lite = "0.2.8"
 quote = "1.0"

@@ -73,7 +73,25 @@ impl AsyncInputStream {
         Ok(len)
     }
 
-    /// Use this `AsyncInputStream` as a `futures_core::stream::Stream` with
+    /// Move the entire contents of an input stream directly into an output
+    /// stream, until the input stream has closed. This operation is optimized
+    /// to avoid copying stream contents into and out of memory.
+    pub async fn copy_to(&self, writer: &AsyncOutputStream) -> std::io::Result<u64> {
+        let mut written = 0;
+        loop {
+            self.ready().await;
+            writer.ready().await;
+            match writer.stream.splice(&self.stream, u64::MAX) {
+                Ok(n) => written += n,
+                Err(StreamError::Closed) => break Ok(written),
+                Err(StreamError::LastOperationFailed(err)) => {
+                    break Err(std::io::Error::other(err.to_debug_string()));
+                }
+            }
+        }
+    }
+
+    /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most 8k. If you want to control chunk size, use
     /// `Self::into_stream_of`.
@@ -84,7 +102,7 @@ impl AsyncInputStream {
         }
     }
 
-    /// Use this `AsyncInputStream` as a `futures_core::stream::Stream` with
+    /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most the `chunk_size` argument specified.
     pub fn into_stream_of(self, chunk_size: usize) -> AsyncInputChunkStream {
@@ -94,7 +112,7 @@ impl AsyncInputStream {
         }
     }
 
-    /// Use this `AsyncInputStream` as a `futures_core::stream::Stream` with
+    /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<u8, std::io::Error>`.
     pub fn into_bytestream(self) -> AsyncInputByteStream {
         AsyncInputByteStream {
@@ -115,7 +133,7 @@ impl AsyncRead for AsyncInputStream {
     }
 }
 
-/// Wrapper of `AsyncInputStream` that impls `futures_core::stream::Stream`
+/// Wrapper of `AsyncInputStream` that impls `futures_lite::stream::Stream`
 /// with an item of `Result<Vec<u8>, std::io::Error>`
 pub struct AsyncInputChunkStream {
     stream: AsyncInputStream,
@@ -129,7 +147,7 @@ impl AsyncInputChunkStream {
     }
 }
 
-impl futures_core::stream::Stream for AsyncInputChunkStream {
+impl futures_lite::stream::Stream for AsyncInputChunkStream {
     type Item = Result<Vec<u8>, std::io::Error>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.stream.poll_ready(cx) {
@@ -148,7 +166,7 @@ impl futures_core::stream::Stream for AsyncInputChunkStream {
 
 pin_project_lite::pin_project! {
     /// Wrapper of `AsyncInputStream` that impls
-    /// `futures_core::stream::Stream` with item `Result<u8, std::io::Error>`.
+    /// `futures_lite::stream::Stream` with item `Result<u8, std::io::Error>`.
     pub struct AsyncInputByteStream {
         #[pin]
         stream: AsyncInputChunkStream,
@@ -170,13 +188,13 @@ impl AsyncInputByteStream {
     }
 }
 
-impl futures_core::stream::Stream for AsyncInputByteStream {
+impl futures_lite::stream::Stream for AsyncInputByteStream {
     type Item = Result<u8, std::io::Error>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
         match this.buffer.next() {
             Some(byte) => Poll::Ready(Some(Ok(byte.expect("cursor on Vec<u8> is infallible")))),
-            None => match futures_core::stream::Stream::poll_next(this.stream, cx) {
+            None => match futures_lite::stream::Stream::poll_next(this.stream, cx) {
                 Poll::Ready(Some(Ok(bytes))) => {
                     let mut bytes = std::io::Read::bytes(std::io::Cursor::new(bytes));
                     match bytes.next() {
@@ -261,6 +279,20 @@ impl AsyncOutputStream {
             }
         }
     }
+
+    /// Asynchronously write to the output stream. This method is the same as
+    /// [`AsyncWrite::write_all`], but doesn't require a `&mut self`.
+    pub async fn write_all(&self, buf: &[u8]) -> std::io::Result<()> {
+        let mut to_write = &buf[0..];
+        loop {
+            let bytes_written = self.write(to_write).await?;
+            to_write = &to_write[bytes_written..];
+            if to_write.is_empty() {
+                return Ok(());
+            }
+        }
+    }
+
     /// Asyncronously flush the output stream. Initiates a flush, and then
     /// awaits until the flush is complete and the output stream is ready for
     /// writing again.
@@ -287,6 +319,7 @@ impl AsyncOutputStream {
         }
     }
 }
+
 impl AsyncWrite for AsyncOutputStream {
     // Required methods
     async fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -300,17 +333,4 @@ impl AsyncWrite for AsyncOutputStream {
     fn as_async_output_stream(&self) -> Option<&AsyncOutputStream> {
         Some(self)
     }
-}
-
-/// Wait for both streams to be ready and then do a WASI splice.
-pub(crate) async fn splice(
-    reader: &AsyncInputStream,
-    writer: &AsyncOutputStream,
-    len: u64,
-) -> Result<u64, StreamError> {
-    // Wait for both streams to be ready.
-    reader.ready().await;
-    writer.ready().await;
-
-    writer.stream.splice(&reader.stream, len)
 }

@@ -1,9 +1,8 @@
 use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser};
 use std::str::FromStr;
-use wstd::http::{
-    body::BodyForthcoming, Client, HeaderMap, HeaderName, HeaderValue, Method, Request, Uri,
-};
+use wstd::http::{Body, BodyExt, Client, HeaderMap, HeaderName, HeaderValue, Method, Request, Uri};
+use wstd::io::AsyncWrite;
 
 /// Complex HTTP client
 ///
@@ -86,23 +85,29 @@ async fn main() -> Result<()> {
         trailers.insert(HeaderName::from_str(key)?, HeaderValue::from_str(value)?);
     }
 
+    let body = if args.body {
+        Body::from_try_stream(wstd::io::stdin().into_inner().into_stream()).into_boxed_body()
+    } else {
+        Body::empty().into_boxed_body()
+    };
+    let t = trailers.clone();
+    let body = body.with_trailers(async move {
+        if t.is_empty() {
+            None
+        } else {
+            Some(Ok(t))
+        }
+    });
+    let request = request.body(Body::from_http_body(body))?;
+
     // Send the request.
-
-    let request = request.body(BodyForthcoming)?;
-
     eprintln!("> {} / {:?}", request.method(), request.version());
     for (key, value) in request.headers().iter() {
         let value = String::from_utf8_lossy(value.as_bytes());
         eprintln!("> {key}: {value}");
     }
 
-    let (mut outgoing_body, response) = client.start_request(request).await?;
-
-    if args.body {
-        wstd::io::copy(wstd::io::stdin(), &mut outgoing_body).await?;
-    } else {
-        wstd::io::copy(wstd::io::empty(), &mut outgoing_body).await?;
-    }
+    let response = client.send(request).await?;
 
     if !trailers.is_empty() {
         eprintln!("...");
@@ -112,10 +117,6 @@ async fn main() -> Result<()> {
         eprintln!("> {key}: {value}");
     }
 
-    Client::finish(outgoing_body, Some(trailers))?;
-
-    let response = response.await?;
-
     // Print the response.
 
     eprintln!("< {:?} {}", response.version(), response.status());
@@ -124,10 +125,12 @@ async fn main() -> Result<()> {
         eprintln!("< {key}: {value}");
     }
 
-    let mut body = response.into_body();
-    wstd::io::copy(&mut body, wstd::io::stdout()).await?;
+    let body = response.into_body().into_boxed_body().collect().await?;
+    let trailers = body.trailers().cloned();
+    wstd::io::stdout()
+        .write_all(body.to_bytes().as_ref())
+        .await?;
 
-    let trailers = body.finish().await?;
     if let Some(trailers) = trailers {
         for (key, value) in trailers.iter() {
             let value = String::from_utf8_lossy(value.as_bytes());

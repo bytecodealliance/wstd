@@ -1,13 +1,12 @@
 use super::REACTOR;
 
 use async_task::{Runnable, Task};
-use core::cell::RefCell;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll, Waker};
 use slab::Slab;
 use std::collections::{HashMap, VecDeque};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use wasip2::io::poll::Pollable;
 
 /// A key for a `Pollable`, which is an index into the `Slab<Pollable>` in `Reactor`.
@@ -31,7 +30,7 @@ impl Drop for Registration {
 /// An AsyncPollable is a reference counted Registration. It can be cloned, and used to create
 /// as many WaitFor futures on a Pollable that the user needs.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AsyncPollable(Rc<Registration>);
+pub struct AsyncPollable(Arc<Registration>);
 
 impl AsyncPollable {
     /// Create an `AsyncPollable` from a Wasi `Pollable`. Schedules the `Pollable` with the current
@@ -92,16 +91,16 @@ impl Drop for WaitFor {
 /// Manage async system resources for WASI 0.2
 #[derive(Debug, Clone)]
 pub struct Reactor {
-    inner: Rc<InnerReactor>,
+    inner: Arc<InnerReactor>,
 }
 
 /// The private, internal `Reactor` implementation - factored out so we can take
 /// a lock of the whole.
 #[derive(Debug)]
 struct InnerReactor {
-    pollables: RefCell<Slab<Pollable>>,
-    wakers: RefCell<HashMap<Waitee, Waker>>,
-    ready_list: RefCell<VecDeque<Runnable>>,
+    pollables: Mutex<Slab<Pollable>>,
+    wakers: Mutex<HashMap<Waitee, Waker>>,
+    ready_list: Mutex<VecDeque<Runnable>>,
 }
 
 impl Reactor {
@@ -121,10 +120,10 @@ impl Reactor {
     /// Create a new instance of `Reactor`
     pub(crate) fn new() -> Self {
         Self {
-            inner: Rc::new(InnerReactor {
-                pollables: RefCell::new(Slab::new()),
-                wakers: RefCell::new(HashMap::new()),
-                ready_list: RefCell::new(VecDeque::new()),
+            inner: Arc::new(InnerReactor {
+                pollables: Mutex::new(Slab::new()),
+                wakers: Mutex::new(HashMap::new()),
+                ready_list: Mutex::new(VecDeque::new()),
             }),
         }
     }
@@ -133,7 +132,7 @@ impl Reactor {
     /// Future pending on their readiness. This function returns indicating
     /// that set of pollables is not empty.
     pub(crate) fn pending_pollables_is_empty(&self) -> bool {
-        self.inner.wakers.borrow().is_empty()
+        self.inner.wakers.lock().unwrap().is_empty()
     }
 
     /// Block until at least one pending pollable is ready, waking a pending future.
@@ -189,8 +188,8 @@ impl Reactor {
     where
         F: FnOnce(&[&Pollable]) -> Vec<u32>,
     {
-        let wakers = self.inner.wakers.borrow();
-        let pollables = self.inner.pollables.borrow();
+        let wakers = self.inner.wakers.lock().unwrap();
+        let pollables = self.inner.pollables.lock().unwrap();
 
         // We're about to wait for a number of pollables. When they wake we get
         // the *indexes* back for the pollables whose events were available - so
@@ -225,18 +224,18 @@ impl Reactor {
 
     /// Turn a Wasi [`Pollable`] into an [`AsyncPollable`]
     pub fn schedule(&self, pollable: Pollable) -> AsyncPollable {
-        let mut pollables = self.inner.pollables.borrow_mut();
+        let mut pollables = self.inner.pollables.lock().unwrap();
         let key = EventKey(pollables.insert(pollable));
-        AsyncPollable(Rc::new(Registration { key }))
+        AsyncPollable(Arc::new(Registration { key }))
     }
 
     fn deregister_event(&self, key: EventKey) {
-        let mut pollables = self.inner.pollables.borrow_mut();
+        let mut pollables = self.inner.pollables.lock().unwrap();
         pollables.remove(key.0);
     }
 
     fn deregister_waitee(&self, waitee: &Waitee) {
-        let mut wakers = self.inner.wakers.borrow_mut();
+        let mut wakers = self.inner.wakers.lock().unwrap();
         wakers.remove(waitee);
     }
 
@@ -244,14 +243,16 @@ impl Reactor {
         let ready = self
             .inner
             .pollables
-            .borrow()
+            .lock()
+            .unwrap()
             .get(waitee.pollable.0.key.0)
             .expect("only live EventKey can be checked for readiness")
             .ready();
         if !ready {
             self.inner
                 .wakers
-                .borrow_mut()
+                .lock()
+                .unwrap()
                 .insert(waitee.clone(), waker.clone());
         }
         ready
@@ -264,7 +265,7 @@ impl Reactor {
         T: 'static,
     {
         let this = self.clone();
-        let schedule = move |runnable| this.inner.ready_list.borrow_mut().push_back(runnable);
+        let schedule = move |runnable| this.inner.ready_list.lock().unwrap().push_back(runnable);
 
         // SAFETY:
         // we're using this exactly like async_task::spawn_local, except that
@@ -273,16 +274,16 @@ impl Reactor {
         // single-threaded.
         #[allow(unsafe_code)]
         let (runnable, task) = unsafe { async_task::spawn_unchecked(fut, schedule) };
-        self.inner.ready_list.borrow_mut().push_back(runnable);
+        self.inner.ready_list.lock().unwrap().push_back(runnable);
         task
     }
 
     pub(super) fn pop_ready_list(&self) -> Option<Runnable> {
-        self.inner.ready_list.borrow_mut().pop_front()
+        self.inner.ready_list.lock().unwrap().pop_front()
     }
 
     pub(super) fn ready_list_is_empty(&self) -> bool {
-        self.inner.ready_list.borrow().is_empty()
+        self.inner.ready_list.lock().unwrap().is_empty()
     }
 }
 

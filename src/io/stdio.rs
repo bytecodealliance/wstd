@@ -24,6 +24,11 @@ impl Stdin {
     pub fn is_terminal(&self) -> bool {
         LazyCell::force(&self.terminput).is_some()
     }
+
+    /// Get the `AsyncInputStream` used to implement `Stdin`
+    pub fn into_inner(self) -> AsyncInputStream {
+        self.stream
+    }
 }
 
 impl AsyncRead for Stdin {
@@ -63,6 +68,11 @@ impl Stdout {
     /// Check if stdout is a terminal.
     pub fn is_terminal(&self) -> bool {
         LazyCell::force(&self.termoutput).is_some()
+    }
+
+    /// Get the `AsyncOutputStream` used to implement `Stdout`
+    pub fn into_inner(self) -> AsyncOutputStream {
+        self.stream
     }
 }
 
@@ -108,6 +118,11 @@ impl Stderr {
     /// Check if stderr is a terminal.
     pub fn is_terminal(&self) -> bool {
         LazyCell::force(&self.termoutput).is_some()
+    }
+
+    /// Get the `AsyncOutputStream` used to implement `Stderr`
+    pub fn into_inner(self) -> AsyncOutputStream {
+        self.stream
     }
 }
 

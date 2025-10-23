@@ -2,6 +2,7 @@ use super::{AsyncRead, AsyncWrite};
 
 #[non_exhaustive]
 pub struct Empty;
+
 impl AsyncRead for Empty {
     async fn read(&mut self, _buf: &mut [u8]) -> super::Result<usize> {
         Ok(0)
