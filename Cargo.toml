@@ -54,7 +54,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.5.6"
+version = "0.6.0"
 edition = "2024"
 license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/bytecodealliance/wstd"
@@ -97,10 +97,10 @@ test-programs = { path = "test-programs" }
 tower-service = "0.3.3"
 ureq = { version = "3.1", default-features = false, features = ["json"] }
 wasip2 = "1.0"
-wstd = { path = ".", version = "=0.5.6" }
-wstd-axum = { path = "./axum", version = "=0.5.6" }
-wstd-axum-macro = { path = "./axum/macro", version = "=0.5.6" }
-wstd-macro = { path = "./macro", version = "=0.5.6" }
+wstd = { path = ".", version = "=0.6.0" }
+wstd-axum = { path = "./axum", version = "=0.6.0" }
+wstd-axum-macro = { path = "./axum/macro", version = "=0.6.0" }
+wstd-macro = { path = "./macro", version = "=0.6.0" }
 
 [package.metadata.docs.rs]
 all-features = true
