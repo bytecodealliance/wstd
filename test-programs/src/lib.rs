@@ -1,6 +1,6 @@
 include!(concat!(env!("OUT_DIR"), "/gen.rs"));
 
-use fslock::LockFile;
+use std::fs::File;
 use std::net::TcpStream;
 use std::process::{Child, Command};
 use std::thread::sleep;
@@ -9,7 +9,7 @@ use std::time::Duration;
 /// Manages exclusive access to port 8081, and kills the process when dropped
 pub struct WasmtimeServe {
     #[expect(dead_code, reason = "exists to live for as long as wasmtime process")]
-    lockfile: LockFile,
+    lockfile: File,
     process: Child,
 }
 
@@ -23,9 +23,9 @@ impl WasmtimeServe {
     /// Kills the wasmtime process, and releases the lock, once dropped.
     pub fn new(guest: &str) -> std::io::Result<Self> {
         let mut lockfile = std::env::temp_dir();
-        lockfile.push("TEST_PROGRAMS_WASMTIME_SERVE.pid");
-        let mut lockfile = LockFile::open(&lockfile)?;
-        lockfile.lock_with_pid()?;
+        lockfile.push("TEST_PROGRAMS_WASMTIME_SERVE.lock");
+        let lockfile = File::create(&lockfile)?;
+        lockfile.lock()?;
 
         // Run wasmtime serve.
         // Enable -Scli because we currently don't have a way to build with the

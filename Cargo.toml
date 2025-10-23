@@ -61,7 +61,7 @@ repository = "https://github.com/bytecodealliance/wstd"
 keywords = ["WebAssembly", "async", "stdlib", "Components"]
 categories = ["wasm", "asynchronous"]
 # Rust-version policy: stable N-2, same as wasmtime.
-rust-version = "1.87"
+rust-version = "1.89"
 authors = [
     "Yoshua Wuyts <rust@yosh.is>",
     "Pat Hickey <pat@moreproductive.org>",
