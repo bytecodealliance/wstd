@@ -19,7 +19,6 @@ json = ["dep:serde", "dep:serde_json"]
 [dependencies]
 anyhow.workspace = true
 async-task.workspace = true
-async-trait.workspace = true
 bytes.workspace = true
 futures-lite.workspace = true
 http-body-util.workspace = true
@@ -71,7 +70,6 @@ authors = [
 [workspace.dependencies]
 anyhow = "1"
 async-task = "4.7"
-async-trait = "*"
 axum = { version = "0.8.6", default-features = false }
 bytes = "1.10.1"
 cargo_metadata = "0.22"
