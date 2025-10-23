@@ -10,7 +10,7 @@ where
     // `AsyncOutputStream`.
     if let Some(reader) = reader.as_async_input_stream() {
         if let Some(writer) = writer.as_async_output_stream() {
-            reader.forward(writer).await?;
+            reader.copy_to(writer).await?;
             return Ok(());
         }
     }

@@ -342,7 +342,7 @@ impl Incoming {
                 .write()
                 .expect("outgoing body already written"),
         );
-        in_stream.forward(&out_stream).await.map_err(|e| {
+        in_stream.copy_to(&out_stream).await.map_err(|e| {
             Error::from(e).context("copying incoming body stream to outgoing body stream")
         })?;
         drop(in_stream);

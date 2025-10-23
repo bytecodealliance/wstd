@@ -76,7 +76,7 @@ impl AsyncInputStream {
     /// Move the entire contents of an input stream directly into an output
     /// stream, until the input stream has closed. This operation is optimized
     /// to avoid copying stream contents into and out of memory.
-    pub async fn forward(&self, writer: &AsyncOutputStream) -> std::io::Result<u64> {
+    pub async fn copy_to(&self, writer: &AsyncOutputStream) -> std::io::Result<u64> {
         let mut written = 0;
         loop {
             self.ready().await;
