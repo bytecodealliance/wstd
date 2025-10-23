@@ -122,20 +122,7 @@ impl AsyncInputStream {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncRead for AsyncInputStream {
-    async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        Self::read(self, buf).await
-    }
-
-    #[inline]
-    fn as_async_input_stream(&self) -> Option<&AsyncInputStream> {
-        Some(self)
-    }
-}
-
-#[async_trait::async_trait(?Send)]
-impl AsyncRead for &AsyncInputStream {
     async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         Self::read(self, buf).await
     }
@@ -333,7 +320,6 @@ impl AsyncOutputStream {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncWrite for AsyncOutputStream {
     // Required methods
     async fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {

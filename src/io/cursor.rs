@@ -57,7 +57,6 @@ where
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl<T> AsyncRead for Cursor<T>
 where
     T: AsRef<[u8]>,
@@ -67,7 +66,6 @@ where
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Cursor<&mut [u8]> {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         std::io::Write::write(&mut self.inner, buf)
@@ -77,7 +75,6 @@ impl AsyncWrite for Cursor<&mut [u8]> {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Cursor<&mut Vec<u8>> {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         std::io::Write::write(&mut self.inner, buf)
@@ -87,7 +84,6 @@ impl AsyncWrite for Cursor<&mut Vec<u8>> {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Cursor<Vec<u8>> {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         std::io::Write::write(&mut self.inner, buf)

@@ -31,7 +31,6 @@ impl Stdin {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncRead for Stdin {
     #[inline]
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
@@ -77,7 +76,6 @@ impl Stdout {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Stdout {
     #[inline]
     async fn write(&mut self, buf: &[u8]) -> Result<usize> {
@@ -128,7 +126,6 @@ impl Stderr {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl AsyncWrite for Stderr {
     #[inline]
     async fn write(&mut self, buf: &[u8]) -> Result<usize> {
