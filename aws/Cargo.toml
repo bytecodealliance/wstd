@@ -18,3 +18,8 @@ aws-smithy-runtime-api = { workspace = true, features = ["client", "http-1x"] }
 http-body-util.workspace = true
 sync_wrapper = { workspace = true, features = ["futures"] }
 wstd.workspace = true
+
+[dev-dependencies]
+aws-config.workspace = true
+aws-sdk-s3.workspace = true
+clap.workspace = true

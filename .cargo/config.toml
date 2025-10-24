@@ -1,2 +1,2 @@
 [target.wasm32-wasip2]
-runner = "wasmtime -Shttp"
+runner = "wasmtime run -Shttp --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY --dir .::."
