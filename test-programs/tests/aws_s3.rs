@@ -10,7 +10,7 @@ fn aws_s3() -> Result<()> {
         .arg("-Shttp")
         .args(["--env", "AWS_ACCESS_KEY_ID"])
         .args(["--env", "AWS_SECRET_ACCESS_KEY"])
-        .args(["--env", "AWS_ACCESS_KEY_ID"])
+        .args(["--env", "AWS_SESSION_TOKEN"])
         .arg(test_programs::aws::S3)
         .arg(format!(
             "--region={}",
