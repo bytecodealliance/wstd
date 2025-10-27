@@ -10,6 +10,10 @@ on:
 env:
   RUSTFLAGS: -Dwarnings
 
+# required for AWS oidc
+permissions:
+  id-token: write
+
 jobs:
   build_and_test:
     name: Build and test
