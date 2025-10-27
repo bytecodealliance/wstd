@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
     match opts.command.as_ref().unwrap_or(&Command::List) {
         Command::List => list(&opts, &client).await,
         Command::Get { key, out } => {
-            let contents = get(&opts, &client, &key).await?;
+            let contents = get(&opts, &client, key).await?;
             let output: &str = if let Some(out) = out {
                 out.as_str()
             } else {

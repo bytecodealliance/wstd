@@ -27,16 +27,10 @@ jobs:
       uses: bytecodealliance/actions/wasmtime/setup@v1
 
     - name: check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-        args: --workspace --all --bins --examples
+      run: cargo check --workspace --all --bins --examples
 
     - name: wstd tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p wstd --target wasm32-wasip2 -- --nocapture
+      run: cargo test -p wstd -p wstd-axum -p wstd-aws --target wasm32-wasip2 -- --nocapture
 
     # pchickey made a role and bucket on his personal aws account
     # it only provides ListBucket and GetObject for a single bucket
@@ -48,17 +42,14 @@ jobs:
         role-to-assume: arn:aws:iam::313377415443:role/wstd-aws-ci-role
         role-session-name: github-ci
 
-    - name: example tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p test-programs -- --nocapture
-        env:
-          AWS_REGION: us-west-2
-          AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ steps.creds.outputs.aws-secret-access-key }}
-          AWS_SESSION_TOKEN: ${{ steps.creds.outputs.aws-session-token }}
-          WSTD_EXAMPLE_BUCKET: wstd-example-bucket
+    - name: test-programs tests
+      run: cargo test -p test-programs -- --nocapture
+      env:
+        AWS_REGION: us-west-2
+        AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.creds.outputs.aws-secret-access-key }}
+        AWS_SESSION_TOKEN: ${{ steps.creds.outputs.aws-session-token }}
+        WSTD_EXAMPLE_BUCKET: wstd-example-bucket
 
   check_fmt_and_docs:
     name: Checking fmt and docs
