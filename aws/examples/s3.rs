@@ -41,7 +41,10 @@ async fn main() -> Result<()> {
     let client = Client::new(&config);
 
     match opts.command.as_ref().unwrap_or(&Command::List) {
-        Command::List => list(&opts, &client).await,
+        Command::List => {
+            let output = list(&opts, &client).await?;
+            print!("{}", output);
+        }
         Command::Get { key, out } => {
             let contents = get(&opts, &client, key).await?;
             let output: &str = if let Some(out) = out {
@@ -50,24 +53,25 @@ async fn main() -> Result<()> {
                 key.as_str()
             };
             std::fs::write(output, contents)?;
-            Ok(())
         }
     }
+    Ok(())
 }
 
-async fn list(opts: &Opts, client: &Client) -> Result<()> {
+async fn list(opts: &Opts, client: &Client) -> Result<String> {
     let mut listing = client
         .list_objects_v2()
         .bucket(opts.bucket.clone())
         .into_paginator()
         .send();
 
-    println!("key\tetag\tlast_modified\tstorage_class");
+    let mut output = String::new();
+    output += "key\tetag\tlast_modified\tstorage_class\n";
     while let Some(res) = listing.next().await {
         let object = res?;
         for item in object.contents() {
-            println!(
-                "{}\t{}\t{}\t{}",
+            output += &format!(
+                "{}\t{}\t{}\t{}\n",
                 item.key().unwrap_or_default(),
                 item.e_tag().unwrap_or_default(),
                 item.last_modified()
@@ -79,7 +83,7 @@ async fn list(opts: &Opts, client: &Client) -> Result<()> {
             );
         }
     }
-    Ok(())
+    Ok(output)
 }
 
 async fn get(opts: &Opts, client: &Client, key: &str) -> Result<Vec<u8>> {
