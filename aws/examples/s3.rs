@@ -30,6 +30,19 @@ enum Command {
 
 #[wstd::main]
 async fn main() -> Result<()> {
+    println!(
+        "debug AWS_ACCESS_KEY_ID={:?}",
+        std::env::var("AWS_ACCESS_KEY_ID")
+    );
+    println!(
+        "debug AWS_SECRET_ACCESS_KEY={:?}",
+        std::env::var("AWS_SECRET_ACCESS_KEY")
+    );
+    println!(
+        "debug AWS_SESSION_TOKEN={:?}",
+        std::env::var("AWS_SESSION_TOKEN")
+    );
+
     let opts = Opts::parse();
     let config = aws_config::defaults(BehaviorVersion::latest())
         .region(Region::new(opts.region.clone()))
