@@ -30,30 +30,35 @@ jobs:
     - name: Install wasmtime
       uses: bytecodealliance/actions/wasmtime/setup@v1
 
+    # pchickey made a role `wstd-aws-ci-role` and bucket `wstd-example-bucket`
+    # on his personal aws account 313377415443. The role only provides
+    # ListBucket and GetObject for the example bucket, which is enough to pass
+    # the single integration test. The role is configured to trust GitHub
+    # actions for the bytecodealliance/wstd repo. This action will set the
+    # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN
+    # environment variables.
+    - name: get aws credentials
+      id: creds
+      uses: aws-actions/configure-aws-credentials@v5.1.0
+      continue-on-error: true
+      with:
+        aws-region: us-west-2
+        role-to-assume: arn:aws:iam::313377415443:role/wstd-aws-ci-role
+        role-session-name: github-ci
+
     - name: check
       run: cargo check --workspace --all --bins --examples
 
     - name: wstd tests
       run: cargo test -p wstd -p wstd-axum -p wstd-aws --target wasm32-wasip2 -- --nocapture
 
-    # pchickey made a role and bucket on his personal aws account
-    # it only provides ListBucket and GetObject for a single bucket
-    - name: Configure AWS Credentials
-      id: creds
-      uses: aws-actions/configure-aws-credentials@v5.1.0
-      with:
-        aws-region: us-west-2
-        role-to-assume: arn:aws:iam::313377415443:role/wstd-aws-ci-role
-        role-session-name: github-ci
-
     - name: test-programs tests
       run: cargo test -p test-programs -- --nocapture
-      env:
-        AWS_REGION: us-west-2
-        #AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}
-        #AWS_SECRET_ACCESS_KEY: ${{ steps.creds.outputs.aws-secret-access-key }}
-        #AWS_SESSION_TOKEN: ${{ steps.creds.outputs.aws-session-token }}
-        WSTD_EXAMPLE_BUCKET: wstd-example-bucket
+      if: steps.creds.outcome == 'success'
+
+    - name: test-programs tests (no aws)
+      run: cargo test -p test-programs --features no-aws -- --nocapture
+      if: steps.creds.outcome != 'success'
 
   check_fmt_and_docs:
     name: Checking fmt and docs

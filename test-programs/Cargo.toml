@@ -15,3 +15,7 @@ ureq.workspace = true
 [build-dependencies]
 cargo_metadata.workspace = true
 heck.workspace = true
+
+[features]
+default = []
+no-aws = []

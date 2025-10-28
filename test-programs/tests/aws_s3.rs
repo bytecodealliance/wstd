@@ -15,6 +15,7 @@ fn run_s3_example() -> Command {
 }
 
 #[test_log::test]
+#[cfg_attr(feature = "no-aws", ignore)]
 fn aws_s3() -> Result<()> {
     // bucket list command
     let output = run_s3_example()
