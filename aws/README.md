@@ -57,7 +57,7 @@ wasmtime run -Shttp \
     --env AWS_SECRET_ACCESS_KEY \
     --env AWS_SESSION_TOKEN \
     --dir .::. \
-    target/wasm22-wasip2/release/examples/s3.wasm
+    target/wasm32-wasip2/release/examples/s3.wasm
 ```
 
 or alternatively run it with:
