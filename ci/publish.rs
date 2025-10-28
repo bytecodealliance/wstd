@@ -16,7 +16,13 @@ use std::thread;
 use std::time::Duration;
 
 // note that this list must be topologically sorted by dependencies
-const CRATES_TO_PUBLISH: &[&str] = &["wstd-macro", "wstd", "wstd-axum-macro", "wstd-axum"];
+const CRATES_TO_PUBLISH: &[&str] = &[
+    "wstd-macro",
+    "wstd",
+    "wstd-axum-macro",
+    "wstd-axum",
+    "wstd-aws",
+];
 
 #[derive(Debug)]
 struct Workspace {
@@ -53,11 +59,13 @@ fn main() {
                 bump_version(&krate, &crates, name == "bump-patch");
             }
             // update the lock file
-            assert!(Command::new("cargo")
-                .arg("fetch")
-                .status()
-                .unwrap()
-                .success());
+            assert!(
+                Command::new("cargo")
+                    .arg("fetch")
+                    .status()
+                    .unwrap()
+                    .success()
+            );
         }
 
         "publish" => {

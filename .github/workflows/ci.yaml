@@ -10,6 +10,10 @@ on:
 env:
   RUSTFLAGS: -Dwarnings
 
+# required for AWS oidc
+permissions:
+  id-token: write
+
 jobs:
   build_and_test:
     name: Build and test
@@ -26,24 +30,35 @@ jobs:
     - name: Install wasmtime
       uses: bytecodealliance/actions/wasmtime/setup@v1
 
-    - name: check
-      uses: actions-rs/cargo@v1
+    # pchickey made a role `wstd-aws-ci-role` and bucket `wstd-example-bucket`
+    # on his personal aws account 313377415443. The role only provides
+    # ListBucket and GetObject for the example bucket, which is enough to pass
+    # the single integration test. The role is configured to trust GitHub
+    # actions for the bytecodealliance/wstd repo. This action will set the
+    # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN
+    # environment variables.
+    - name: get aws credentials
+      id: creds
+      uses: aws-actions/configure-aws-credentials@v5.1.0
+      continue-on-error: true
       with:
-        command: check
-        args: --workspace --all --bins --examples
+        aws-region: us-west-2
+        role-to-assume: arn:aws:iam::313377415443:role/wstd-aws-ci-role
+        role-session-name: github-ci
+
+    - name: check
+      run: cargo check --workspace --all --bins --examples
 
     - name: wstd tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p wstd --target wasm32-wasip2 -- --nocapture
+      run: cargo test -p wstd -p wstd-axum -p wstd-aws --target wasm32-wasip2 -- --nocapture
 
-    - name: example tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p test-programs -- --nocapture
+    - name: test-programs tests
+      run: cargo test -p test-programs -- --nocapture
+      if: steps.creds.outcome == 'success'
 
+    - name: test-programs tests (no aws)
+      run: cargo test -p test-programs --features no-aws -- --nocapture
+      if: steps.creds.outcome != 'success'
 
   check_fmt_and_docs:
     name: Checking fmt and docs
