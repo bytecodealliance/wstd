@@ -1,7 +1,7 @@
 // Run the example with:
 // cargo build --example http_server_proxy --target=wasm32-wasip2
 // wasmtime serve -Scli -Shttp --env TARGET_URL=https://example.com/ target/wasm32-wasip2/debug/examples/http_server_proxy.wasm
-// Test with `curl --no-buffer -v 127.0.0.1:8080/proxy/`
+// curl --no-buffer -v 127.0.0.1:8080/proxy/
 
 use wstd::http::body::Body;
 use wstd::http::{Client, Error, Request, Response, StatusCode, Uri};
@@ -53,12 +53,8 @@ async fn proxy(server_req: Request<Body>, target_url: Uri) -> Result<Response<Bo
             .expect("no errors could be in ResponseBuilder")
             .append(key, value.clone());
     }
-    let resp_body = server_resp
-        .body(client_resp.into_body().into_boxed_body())
-        .map_err(Error::from)?;
-    let (resp_parts, resp_body) = resp_body.into_parts();
-    let resp_body = Body::from_http_body(resp_body);
-    Ok(Response::from_parts(resp_parts, resp_body))
+    let resp_body = Body::from_http_body(client_resp.into_body().into_boxed_body());
+    Ok(server_resp.body(resp_body)?)
 }
 
 fn http_not_found(_request: Request<Body>) -> Response<Body> {
