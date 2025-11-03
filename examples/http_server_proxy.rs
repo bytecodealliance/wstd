@@ -41,8 +41,7 @@ async fn proxy(server_req: Request<Body>, target_url: Uri) -> Result<Response<Bo
     }
 
     // Stream the request body.
-    let client_body = Body::from_http_body(server_req.into_body().into_boxed_body());
-    let client_req = client_req.body(client_body)?;
+    let client_req = client_req.body(server_req.into_body())?;
     // Send the request.
     let client_resp = client.send(client_req).await?;
     // Copy headers from `client_resp` to `server_resp`.
@@ -53,8 +52,7 @@ async fn proxy(server_req: Request<Body>, target_url: Uri) -> Result<Response<Bo
             .expect("no errors could be in ResponseBuilder")
             .append(key, value.clone());
     }
-    let resp_body = Body::from_http_body(client_resp.into_body().into_boxed_body());
-    Ok(server_resp.body(resp_body)?)
+    Ok(server_resp.body(client_resp.into_body())?)
 }
 
 fn http_not_found(_request: Request<Body>) -> Response<Body> {
