@@ -6,7 +6,7 @@ use crate::time::Duration;
 use wasip2::http::types::RequestOptions as WasiRequestOptions;
 
 /// An HTTP client.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     options: Option<RequestOptions>,
 }
@@ -85,7 +85,7 @@ impl Client {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct RequestOptions {
     connect_timeout: Option<Duration>,
     first_byte_timeout: Option<Duration>,

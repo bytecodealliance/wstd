@@ -1,0 +1,25 @@
+[package]
+name = "wstd-aws"
+description = ""
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+aws-smithy-async = { workspace = true }
+aws-smithy-types = { workspace = true, features = ["http-body-1-x"] }
+aws-smithy-runtime-api = { workspace = true, features = ["client", "http-1x"] }
+http-body-util.workspace = true
+sync_wrapper = { workspace = true, features = ["futures"] }
+wstd.workspace = true
+
+[dev-dependencies]
+aws-config.workspace = true
+aws-sdk-s3.workspace = true
+clap.workspace = true
