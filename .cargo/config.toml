@@ -1,2 +1,5 @@
 [target.wasm32-wasip2]
+# wasmtime is given:
+# * AWS auth environment variables, for running the wstd-aws integration tests.
+# * . directory is available at .
 runner = "wasmtime run -Shttp --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY --env AWS_SESSION_TOKEN --dir .::."
