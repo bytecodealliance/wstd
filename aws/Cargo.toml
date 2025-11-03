@@ -1,6 +1,6 @@
 [package]
 name = "wstd-aws"
-description = ""
+description = "AWS rust sdk support for Wasm Components and WASI 0.2, based on wstd"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
