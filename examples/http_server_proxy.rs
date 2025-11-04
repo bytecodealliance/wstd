@@ -1,8 +1,9 @@
-// Run the example with:
-// cargo build --example http_server_proxy --target=wasm32-wasip2
-// wasmtime serve -Scli -Shttp --env TARGET_URL=https://example.com/ target/wasm32-wasip2/debug/examples/http_server_proxy.wasm
-// curl --no-buffer -v 127.0.0.1:8080/proxy/
-
+//! Run the example with:
+//! ```sh
+//! cargo build --example http_server_proxy --target=wasm32-wasip2
+//! wasmtime serve -Scli -Shttp --env TARGET_URL=https://example.com/ target/wasm32-wasip2/debug/examples/http_server_proxy.wasm
+//! curl --no-buffer -v 127.0.0.1:8080/proxy/
+//! ```
 use wstd::http::body::Body;
 use wstd::http::{Client, Error, Request, Response, StatusCode, Uri};
 
