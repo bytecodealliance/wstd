@@ -26,6 +26,8 @@ jobs:
     - uses: actions/checkout@master
 
     - uses: ./.github/actions/install-rust
+      with:
+        toolchain: 1.89.0
 
     - name: Install wasmtime
       uses: bytecodealliance/actions/wasmtime/setup@v1
