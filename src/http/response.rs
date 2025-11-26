@@ -2,7 +2,7 @@ use http::StatusCode;
 use wasip2::http::types::IncomingResponse;
 
 use crate::http::body::{Body, BodyHint};
-use crate::http::error::{Context, Error};
+use crate::http::error::Error;
 use crate::http::fields::{HeaderMap, header_map_from_wasi};
 
 pub use http::response::{Builder, Response};
@@ -22,10 +22,8 @@ pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<B
     let body = Body::from_incoming(incoming_body, hint);
 
     let mut builder = Response::builder().status(status);
-
-    if let Some(headers_mut) = builder.headers_mut() {
-        *headers_mut = headers;
-    }
-
-    builder.body(body).context("building response")
+    *builder.headers_mut().expect("builder has not errored") = headers;
+    Ok(builder
+        .body(body)
+        .expect("response builder should not error"))
 }
