@@ -2,7 +2,7 @@ use http::StatusCode;
 use wasip2::http::types::IncomingResponse;
 
 use crate::http::body::{Body, BodyHint};
-use crate::http::error::{Context, Error};
+use crate::http::error::Error;
 use crate::http::fields::{HeaderMap, header_map_from_wasi};
 
 pub use http::response::{Builder, Response};
@@ -22,10 +22,17 @@ pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<B
     let body = Body::from_incoming(incoming_body, hint);
 
     let mut builder = Response::builder().status(status);
-
-    if let Some(headers_mut) = builder.headers_mut() {
-        *headers_mut = headers;
-    }
-
-    builder.body(body).context("building response")
+    // The [`http::response::Builder`] keeps internal state of whether the
+    // builder has errored, which is only reachable by passing
+    // [`Builder::header`] an erroring `TryInto<HeaderName>` or
+    // `TryInto<HeaderValue>`. Since the `Builder::header` method is never
+    // used, we know `Builder::headers_mut` will never give the None case, nor
+    // will `Builder::body` give the error case. So, rather than treat those
+    // as control flow, we unwrap if this invariant is ever broken because
+    // that would only be possible due to some unrecoverable bug in wstd,
+    // rather than incorrect use or invalid input.
+    *builder.headers_mut().expect("builder has not errored") = headers;
+    Ok(builder
+        .body(body)
+        .expect("response builder should not error"))
 }
