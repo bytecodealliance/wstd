@@ -258,11 +258,17 @@ impl Reactor {
         ready
     }
 
-    /// Spawn a `Task` on the `Reactor`.
-    pub fn spawn<F, T>(&self, fut: F) -> Task<T>
+    /// We need an unchecked spawn for implementing `block_on`, where the
+    /// implementation does not expose the resulting Task and does not return
+    /// until all tasks have finished execution.
+    ///
+    /// # Safety
+    /// Caller must ensure that the Task<T> does not outlive the Future F or
+    /// F::Output T.
+    #[allow(unsafe_code)]
+    pub(crate) unsafe fn spawn_unchecked<F, T>(&self, fut: F) -> Task<T>
     where
-        F: Future<Output = T> + 'static,
-        T: 'static,
+        F: Future<Output = T>,
     {
         let this = self.clone();
         let schedule = move |runnable| this.inner.ready_list.lock().unwrap().push_back(runnable);
@@ -276,6 +282,19 @@ impl Reactor {
         let (runnable, task) = unsafe { async_task::spawn_unchecked(fut, schedule) };
         self.inner.ready_list.lock().unwrap().push_back(runnable);
         task
+    }
+
+    /// Spawn a `Task` on the `Reactor`.
+    pub fn spawn<F, T>(&self, fut: F) -> Task<T>
+    where
+        F: Future<Output = T> + 'static,
+        T: 'static,
+    {
+        // Safety: 'static constraints satisfy the lifetime requirements
+        #[allow(unsafe_code)]
+        unsafe {
+            self.spawn_unchecked(fut)
+        }
     }
 
     pub(super) fn pop_ready_list(&self) -> Option<Runnable> {

@@ -7,8 +7,7 @@ use std::task::{Context, Poll, Waker};
 /// Start the event loop. Blocks until the future
 pub fn block_on<F>(fut: F) -> F::Output
 where
-    F: Future + 'static,
-    F::Output: 'static,
+    F: Future,
 {
     // Construct the reactor
     let reactor = Reactor::new();
@@ -19,7 +18,11 @@ where
     }
 
     // Spawn the task onto the reactor.
-    let root_task = reactor.spawn(fut);
+    // Safety: The execution loop below, concluding with pulling the Ready out
+    // of the root_task, ensures that it does not outlive the Future or its
+    // output.
+    #[allow(unsafe_code)]
+    let root_task = unsafe { reactor.spawn_unchecked(fut) };
 
     loop {
         match reactor.pop_ready_list() {
