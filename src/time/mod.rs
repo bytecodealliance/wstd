@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use wasip2::clocks::{
     monotonic_clock::{subscribe_duration, subscribe_instant},
-    wall_clock,
+    wall_clock::{self, Datetime},
 };
 
 use crate::{
@@ -28,10 +28,29 @@ use crate::{
 pub struct SystemTime(wall_clock::Datetime);
 
 impl SystemTime {
+    pub const UNIX_EPOCH: SystemTime = SystemTime(Datetime {
+        seconds: 0,
+        nanoseconds: 0,
+    });
+
     pub fn now() -> Self {
         Self(wall_clock::now())
     }
+
+    pub fn duration_since(&self, earlier: &SystemTime) -> Result<Duration, SystemTimeError> {
+        if self.0.seconds >= earlier.0.seconds {
+            if self.0.nanoseconds >= earlier.0.nanoseconds {
+                return Ok(Duration::new(
+                    self.0.seconds - earlier.0.seconds,
+                    self.0.nanoseconds - earlier.0.nanoseconds,
+                ));
+            }
+        }
+        Err(SystemTimeError())
+    }
 }
+
+pub struct SystemTimeError();
 
 /// An async iterator representing notifications at fixed interval.
 pub fn interval(duration: Duration) -> Interval {
@@ -111,6 +130,18 @@ mod test {
         let d = now.duration_since(start);
         let d: std::time::Duration = d.into();
         println!("{what} awaited for {} s", d.as_secs_f32());
+    }
+
+    #[test]
+    fn systemtime() {
+        crate::runtime::block_on(async {
+            let earlier = SystemTime::UNIX_EPOCH;
+            let now = SystemTime::now();
+
+            assert!(now.duration_since(&earlier).is_ok());
+            assert!(now.duration_since(&now).is_ok_and(|x| x.as_secs() == 0));
+            assert!(earlier.duration_since(&now).is_err());
+        });
     }
 
     #[test]
