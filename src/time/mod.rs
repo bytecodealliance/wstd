@@ -37,7 +37,7 @@ impl SystemTime {
         Self(wall_clock::now())
     }
 
-    pub fn duration_since(&self, earlier: &SystemTime) -> Result<Duration, SystemTimeError> {
+    pub fn duration_since(&self, earlier: SystemTime) -> Result<Duration, SystemTimeError> {
         if self.0.seconds >= earlier.0.seconds && self.0.nanoseconds >= earlier.0.nanoseconds {
             return Ok(Duration::new(
                 self.0.seconds - earlier.0.seconds,
@@ -49,6 +49,7 @@ impl SystemTime {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct SystemTimeError;
 
 /// An async iterator representing notifications at fixed interval.
@@ -137,9 +138,9 @@ mod test {
             let earlier = SystemTime::UNIX_EPOCH;
             let now = SystemTime::now();
 
-            assert!(now.duration_since(&earlier).is_ok());
-            assert!(now.duration_since(&now).is_ok_and(|x| x.as_secs() == 0));
-            assert!(earlier.duration_since(&now).is_err());
+            assert!(now.duration_since(earlier).is_ok());
+            assert!(now.duration_since(now).is_ok_and(|x| x.as_secs() == 0));
+            assert!(earlier.duration_since(now).is_err());
         });
     }
 
