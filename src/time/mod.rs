@@ -38,19 +38,18 @@ impl SystemTime {
     }
 
     pub fn duration_since(&self, earlier: &SystemTime) -> Result<Duration, SystemTimeError> {
-        if self.0.seconds >= earlier.0.seconds {
-            if self.0.nanoseconds >= earlier.0.nanoseconds {
-                return Ok(Duration::new(
-                    self.0.seconds - earlier.0.seconds,
-                    self.0.nanoseconds - earlier.0.nanoseconds,
-                ));
-            }
+        if self.0.seconds >= earlier.0.seconds && self.0.nanoseconds >= earlier.0.nanoseconds {
+            return Ok(Duration::new(
+                self.0.seconds - earlier.0.seconds,
+                self.0.nanoseconds - earlier.0.nanoseconds,
+            ));
         }
-        Err(SystemTimeError())
+
+        Err(SystemTimeError)
     }
 }
 
-pub struct SystemTimeError();
+pub struct SystemTimeError;
 
 /// An async iterator representing notifications at fixed interval.
 pub fn interval(duration: Duration) -> Interval {
@@ -133,7 +132,7 @@ mod test {
     }
 
     #[test]
-    fn systemtime() {
+    fn systemtime_duration_since() {
         crate::runtime::block_on(async {
             let earlier = SystemTime::UNIX_EPOCH;
             let now = SystemTime::now();
