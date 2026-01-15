@@ -14,12 +14,12 @@ runs:
       shell: bash
       id: select
       run: |
-        # Determine MSRV as N in `1.N.0` by looking at the `rust-version`
-        # located in the root `Cargo.toml`.
-        msrv=$(grep 'rust-version.*1' Cargo.toml | sed 's/.*\.\([0-9]*\)\..*/\1/')
+        # Determine MSRV by looking at the `rust-version` located in the root
+        # `Cargo.toml`.
+        msrv=$(grep 'rust-version.*1' Cargo.toml | sed 's/rust-version *\= *"\([^"]*\)"/\1/')
 
         if [ "${{ inputs.toolchain }}" = "msrv" ]; then
-          echo "version=1.$msrv.0" >> "$GITHUB_OUTPUT"
+          echo "version=$msrv" >> "$GITHUB_OUTPUT"
         else
           echo "version=${{ inputs.toolchain }}" >> "$GITHUB_OUTPUT"
         fi
