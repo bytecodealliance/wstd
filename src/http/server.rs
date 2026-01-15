@@ -77,12 +77,11 @@ impl Responder {
 
     /// This is used by the `http_server` macro.
     #[doc(hidden)]
-    pub fn fail(self, err: Error) -> Result<(), Error> {
+    pub fn fail(self, err: Error) {
         let e = match err.downcast_ref::<ErrorCode>() {
             Some(e) => e.clone(),
             None => ErrorCode::InternalError(Some(format!("{err:?}"))),
         };
         ResponseOutparam::set(self.outparam, Err(e));
-        Err(err)
     }
 }

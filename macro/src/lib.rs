@@ -138,9 +138,9 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
                     match ::wstd::http::request::try_from_incoming(request) {
                         Ok(request) => match __run(request) #run_await {
                             Ok(response) => { responder.respond(response).await.unwrap() },
-                            Err(err) => responder.fail(err).unwrap(),
+                            Err(err) => responder.fail(err),
                         }
-                        Err(err) => responder.fail(err).unwrap(),
+                        Err(err) => responder.fail(err),
                     }
                 })
             }
