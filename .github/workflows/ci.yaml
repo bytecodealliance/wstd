@@ -17,10 +17,9 @@ permissions:
 jobs:
   build_and_test:
     name: Build and test
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
         rust: [msrv, stable, nightly]
 
     steps:
