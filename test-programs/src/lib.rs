@@ -6,6 +6,9 @@ use std::process::{Child, Command};
 use std::thread::sleep;
 use std::time::Duration;
 
+// Required until msrv over 1.89, at which point locking is available in std
+use fs2::FileExt;
+
 const DEFAULT_SERVER_PORT: u16 = 8081;
 
 /// Manages exclusive access to port 8081, and kills the process when dropped
@@ -31,7 +34,8 @@ impl WasmtimeServe {
         let mut lockfile = std::env::temp_dir();
         lockfile.push(format!("TEST_PROGRAMS_WASMTIME_SERVE_{port}.lock"));
         let lockfile = File::create(&lockfile)?;
-        lockfile.lock()?;
+        // Once msrv reaches 1.89, replace with std's `.lock()` method
+        lockfile.lock_exclusive()?;
 
         // Run wasmtime serve.
         // Enable -Scli because we currently don't have a way to build with the
