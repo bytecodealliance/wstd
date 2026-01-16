@@ -16,6 +16,9 @@ ureq.workspace = true
 cargo_metadata.workspace = true
 heck.workspace = true
 
+[dependencies]
+fs2 = "0.4"
+
 [features]
 default = []
 no-aws = []
