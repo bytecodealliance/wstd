@@ -22,7 +22,8 @@ use crate::{
 };
 
 /// A measurement of the system clock, useful for talking to external entities
-/// like the file system or other processes.
+/// like the file system or other processes. May be converted losslessly to a
+/// more useful `std::time::SystemTime` to provide more methods.
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub struct SystemTime(wall_clock::Datetime);
@@ -30,6 +31,14 @@ pub struct SystemTime(wall_clock::Datetime);
 impl SystemTime {
     pub fn now() -> Self {
         Self(wall_clock::now())
+    }
+}
+
+impl From<SystemTime> for std::time::SystemTime {
+    fn from(st: SystemTime) -> Self {
+        std::time::SystemTime::UNIX_EPOCH
+            + std::time::Duration::from_secs(st.0.seconds)
+            + std::time::Duration::from_nanos(st.0.nanoseconds.into())
     }
 }
 
