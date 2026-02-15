@@ -30,7 +30,7 @@ impl Client {
         let wasi_body = wasi_req.body().unwrap();
 
         // 1. Start sending the request head
-        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?).unwrap();
+        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?)?;
 
         let ((), body) = futures_lite::future::try_zip(
             async move {
