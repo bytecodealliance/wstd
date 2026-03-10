@@ -1,0 +1,26 @@
+[package]
+name = "wstd-aws-example"
+description = "demonstrate use of aws-smithy-wasm wstd support"
+publish = false
+version = "0.6.5"
+edition = "2024"
+license = "Apache-2.0 WITH LLVM-exception"
+repository = "https://github.com/bytecodealliance/wstd"
+keywords = ["WebAssembly", "async", "stdlib", "Components"]
+categories = ["wasm", "asynchronous"]
+rust-version = "1.91.1"
+authors = [
+    "Pat Hickey <pat@moreproductive.org>",
+]
+[[bin]]
+name = "s3"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4.5", features = ["derive"] }
+aws-config = { version = "1.8.15", default-features = false }
+aws-sdk-s3 = { version = "1.125.0", default-features = false }
+aws-smithy-wasm = "0.1.10"
+wstd = "0.6.5"
+
+[workspace]
