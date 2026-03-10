@@ -30,7 +30,7 @@ impl Instant {
     /// Returns the amount of time elapsed from another instant to this one, or zero duration if
     /// that instant is later than this one.
     pub fn duration_since(&self, earlier: Instant) -> Duration {
-        Duration::from_nanos(self.0.checked_sub(earlier.0).unwrap_or_default())
+        Duration::from_nanos(self.0.saturating_sub(earlier.0))
     }
 
     /// Returns the amount of time elapsed since this instant.
