@@ -21,7 +21,10 @@ const CRATES_TO_PUBLISH: &[&str] = &[
     "wstd",
     "wstd-axum-macro",
     "wstd-axum",
-    "wstd-aws",
+];
+// These crates will never have their manifest modified by this publish script
+const CRATES_TO_IGNORE: &[&str] = &[
+    "wstd-aws-example"
 ];
 
 #[derive(Debug)]
@@ -104,7 +107,9 @@ fn main() {
 fn find_crates(dir: &Path, ws: &Workspace, dst: &mut Vec<Crate>) {
     if dir.join("Cargo.toml").exists() {
         let krate = read_crate(Some(ws), &dir.join("Cargo.toml"));
-        if !krate.publish || CRATES_TO_PUBLISH.iter().any(|c| krate.name == *c) {
+        if CRATES_TO_IGNORE.iter().any(|c| krate.name == *c) {
+            // Ignore!
+        } else if !krate.publish || CRATES_TO_PUBLISH.iter().any(|c| krate.name == *c) {
             dst.push(krate);
         } else {
             panic!("failed to find {:?} in whitelist or blacklist", krate.name);
