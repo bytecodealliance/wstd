@@ -21,6 +21,6 @@ clap = { version = "4.5", features = ["derive"] }
 aws-config = { version = "1.8.15", default-features = false }
 aws-sdk-s3 = { version = "1.125.0", default-features = false }
 aws-smithy-wasm = "0.1.10"
-wstd = "0.6.5"
+wstd = "0.6.6"
 
 [workspace]
