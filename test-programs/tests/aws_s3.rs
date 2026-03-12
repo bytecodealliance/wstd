@@ -11,6 +11,14 @@ fn run_s3_example() -> Command {
     command.args(["--env", "AWS_SESSION_TOKEN"]);
     command.args(["--dir", ".::."]);
     command.arg(test_programs::aws::S3);
+    command.arg(format!(
+        "--region={}",
+        std::env::var("AWS_REGION").unwrap_or_else(|_| "us-west-2".to_owned())
+    ));
+    command.arg(format!(
+        "--bucket={}",
+        std::env::var("WSTD_EXAMPLE_BUCKET").unwrap_or_else(|_| "wstd-example-bucket".to_owned())
+    ));
     command
 }
 
@@ -18,18 +26,7 @@ fn run_s3_example() -> Command {
 #[cfg_attr(feature = "no-aws", ignore)]
 fn aws_s3() -> Result<()> {
     // bucket list command
-    let output = run_s3_example()
-        .arg(format!(
-            "--region={}",
-            std::env::var("AWS_REGION").unwrap_or_else(|_| "us-west-2".to_owned())
-        ))
-        .arg(format!(
-            "--bucket={}",
-            std::env::var("WSTD_EXAMPLE_BUCKET")
-                .unwrap_or_else(|_| "wstd-example-bucket".to_owned())
-        ))
-        .arg("list")
-        .output()?;
+    let output = run_s3_example().arg("list").output()?;
     println!("{:?}", output);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -37,19 +34,7 @@ fn aws_s3() -> Result<()> {
     assert!(stdout.contains("shoug.jpg"));
 
     // bucket get command
-    let output = run_s3_example()
-        .arg(format!(
-            "--region={}",
-            std::env::var("AWS_REGION").unwrap_or_else(|_| "us-west-2".to_owned())
-        ))
-        .arg(format!(
-            "--bucket={}",
-            std::env::var("WSTD_EXAMPLE_BUCKET")
-                .unwrap_or_else(|_| "wstd-example-bucket".to_owned())
-        ))
-        .arg("get")
-        .arg("shoug.jpg")
-        .output()?;
+    let output = run_s3_example().arg("get").arg("shoug.jpg").output()?;
     println!("{:?}", output);
     assert!(output.status.success());
 

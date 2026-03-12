@@ -7,21 +7,24 @@ use std::process::Command;
 fn main() {
     let out_dir = PathBuf::from(var_os("OUT_DIR").expect("OUT_DIR env var exists"));
 
-    let meta = MetadataCommand::new().exec().expect("cargo metadata");
+    let meta = MetadataCommand::new()
+        .exec()
+        .expect("cargo metadata for workspace");
 
     println!(
         "cargo:rerun-if-changed={}",
         meta.workspace_root.as_os_str().to_str().unwrap()
     );
 
-    fn build_examples(pkg: &str, out_dir: &PathBuf) {
+    fn build_targets(pkg: &str, manifest: &str, kind: &str, out_dir: &PathBuf) {
         // release build is required for aws sdk to not overflow wasm locals
         let status = Command::new("cargo")
             .arg("build")
-            .arg("--examples")
+            .arg(kind)
             .arg("--release")
             .arg("--target=wasm32-wasip2")
             .arg(format!("--package={pkg}"))
+            .arg(format!("--manifest-path={manifest}"))
             .env("CARGO_TARGET_DIR", out_dir)
             .env("CARGO_PROFILE_DEV_DEBUG", "2")
             .env("RUSTFLAGS", rustflags())
@@ -30,25 +33,33 @@ fn main() {
             .expect("cargo build wstd examples");
         assert!(status.success());
     }
-    build_examples("wstd", &out_dir);
-    build_examples("wstd-axum", &out_dir);
-    build_examples("wstd-aws", &out_dir);
+    build_targets("wstd", "../Cargo.toml", "--examples", &out_dir);
+    build_targets("wstd-axum", "../Cargo.toml", "--examples", &out_dir);
+    build_targets(
+        "wstd-aws-example",
+        "../aws-example/Cargo.toml",
+        "--bins",
+        &out_dir,
+    );
 
     let mut generated_code = "// THIS FILE IS GENERATED CODE\n".to_string();
 
-    fn module_for(name: &str, out_dir: &Path, meta: &Package) -> String {
+    fn module_for(name: &str, kind: TargetKind, out_dir: &Path, meta: &Package) -> String {
         let mut generated_code = String::new();
+        for target in meta.targets.iter() {
+            generated_code += &format!("// {target:?} \n");
+        }
         generated_code += &format!("pub mod {name} {{");
-        for binary in meta
-            .targets
-            .iter()
-            .filter(|t| t.kind == [TargetKind::Example])
-        {
-            let component_path = out_dir
-                .join("wasm32-wasip2")
-                .join("release")
-                .join("examples")
-                .join(format!("{}.wasm", binary.name));
+        for binary in meta.targets.iter().filter(|t| t.kind == [kind.clone()]) {
+            let mut component_path = out_dir.join("wasm32-wasip2").join("release");
+            match kind {
+                TargetKind::Bin => {}
+                TargetKind::Example => {
+                    component_path = component_path.join("examples");
+                }
+                _ => unimplemented!("path interpolation for TargetKind {kind:?}"),
+            }
+            component_path = component_path.join(format!("{}.wasm", binary.name));
 
             let const_name = binary.name.to_shouty_snake_case();
             generated_code += &format!(
@@ -62,6 +73,7 @@ fn main() {
 
     generated_code += &module_for(
         "_wstd",
+        TargetKind::Example,
         &out_dir,
         meta.packages
             .iter()
@@ -71,19 +83,26 @@ fn main() {
     generated_code += "pub use _wstd::*;\n\n";
     generated_code += &module_for(
         "axum",
+        TargetKind::Example,
         &out_dir,
         meta.packages
             .iter()
             .find(|p| *p.name == "wstd-axum")
             .expect("wstd-axum is in cargo metadata"),
     );
+    let aws_example_meta = MetadataCommand::new()
+        .manifest_path("../aws-example/Cargo.toml")
+        .exec()
+        .expect("cargo metadata for aws-example");
     generated_code += &module_for(
         "aws",
+        TargetKind::Bin,
         &out_dir,
-        meta.packages
+        aws_example_meta
+            .packages
             .iter()
-            .find(|p| *p.name == "wstd-aws")
-            .expect("wstd-aws is in cargo metadata"),
+            .find(|p| *p.name == "wstd-aws-example")
+            .expect("wstd-aws-example is in cargo metadata"),
     );
 
     std::fs::write(out_dir.join("gen.rs"), generated_code).unwrap();

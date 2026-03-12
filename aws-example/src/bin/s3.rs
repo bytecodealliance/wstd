@@ -48,13 +48,12 @@ use aws_sdk_s3::Client;
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 struct Opts {
-    /// The AWS Region. Defaults to us-west-2 if not provided.
+    /// The AWS Region for the s3 bucket.
     #[arg(short, long)]
-    region: Option<String>,
-    /// The name of the bucket. Defaults to wstd-example-bucket if not
-    /// provided.
+    region: String,
+    /// The name of the s3 bucket.
     #[arg(short, long)]
-    bucket: Option<String>,
+    bucket: String,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -73,19 +72,13 @@ enum Command {
 #[wstd::main]
 async fn main() -> Result<()> {
     let opts = Opts::parse();
-    let region = opts
-        .region
-        .clone()
-        .unwrap_or_else(|| "us-west-2".to_owned());
-    let bucket = opts
-        .bucket
-        .clone()
-        .unwrap_or_else(|| "wstd-example-bucket".to_owned());
+    let region = opts.region;
+    let bucket = opts.bucket;
 
     let config = aws_config::defaults(BehaviorVersion::latest())
         .region(Region::new(region))
-        .sleep_impl(wstd_aws::sleep_impl())
-        .http_client(wstd_aws::http_client())
+        .sleep_impl(aws_smithy_wasm::wasi::WasiSleep)
+        .http_client(aws_smithy_wasm::wasi::WasiHttpClientBuilder::new().build())
         .load()
         .await;
 

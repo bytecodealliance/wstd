@@ -1,8 +1,23 @@
 
-# wstd-aws: wstd support for the AWS Rust SDK
+# wstd-aws-example: using wstd support in the AWS Rust SDK
 
-This crate provides support for using the AWS Rust SDK for the `wasm32-wasip2`
-target using the [`wstd`] crate.
+The AWS Rust SDK has support for using the [`wstd`] crate on the
+`wasm32-wasip2` target to use the wasi-http interface. This example shows how
+to use it.
+
+## TL;DR 
+
+* depend on `aws-*` crates released recently enough to have MSRV of 1.91.1 (on
+  or after March 4, 2026). Use `default-features = false` so tokio doesn't get
+  sucked in.
+* depend on `aws-smithy-wasm` and setup your `Config` with:
+    ```
+    config
+        .sleep_impl(aws_smithy_wasm::wasi::WasiSleep)
+        .http_client(aws_smithy_wasm::wasi::WasiHttpClientBuilder::new().build())
+    ```
+
+## Explanation
 
 In many wasi settings, its necessary or desirable to use the wasi-http
 interface to make http requests. Wasi-http interfaces provide an http
@@ -17,14 +32,16 @@ and if they do, they will not use the wasi-http interfaces. To avoid using
 http over sockets, make sure to set the `default-features = false` setting
 when depending on any `aws-*` crates in your project.
 
-To configure `wstd`'s wasi-http client for the AWS Rust SDK, provide
-`wstd_aws::sleep_impl()` and `wstd_aws::http_client()` to your
+To configure the AWS Rust SDK to use `wstd`'s wasi-http client, use the
+[`aws_smithy_crate`](https://docs.rs/aws-smithy-wasm/latest/aws_smithy_wasm/)
+at version 0.10.0 or later. Provide `aws_smithy_wasm::wasi::WasiSleep` and
+`aws_smithy_wasm::wasi::WasiHttpClientBuilder::new().build()` to your
 [`aws_config::ConfigLoader`]:
 
 ```
     let config = aws_config::defaults(BehaviorVersion::latest())
-        .sleep_impl(wstd_aws::sleep_impl())
-        .http_client(wstd_aws::http_client())
+        .sleep_impl(aws_smithy_wasm::wasi::WasiSleep)
+        .http_client(aws_smithy_wasm::wasi::WasiHttpClientBuilder::new().build())
         ...;
 ```
 
@@ -44,11 +61,12 @@ a single function.
 Compile it with:
 
 ```sh
-cargo build -p wstd-aws --target wasm32-wasip2 --release --examples
+cargo build -p wstd-aws-example --target wasm32-wasip2 --release
 ```
 
 When running this example, you will need AWS credentials provided in environment
-variables.
+variables, and you should substitute in a region and bucket where your
+credentials have permissions to list the bucket and read items.
 
 Run it with:
 ```sh
@@ -57,19 +75,20 @@ wasmtime run -Shttp \
     --env AWS_SECRET_ACCESS_KEY \
     --env AWS_SESSION_TOKEN \
     --dir .::. \
-    target/wasm32-wasip2/release/examples/s3.wasm
+    target/wasm32-wasip2/release/s3.wasm \
+    --region us-west-2 \
+    --bucket wstd-example-bucket
 ```
 
 or alternatively run it with:
 ```sh
-cargo run --target wasm32-wasip2 -p wstd-aws --example s3
+cargo run --target wasm32-wasip2 -p wstd-aws-example --example s3 -- \
+    --region us-west-2 --bucket wstd-example-bucket
 ```
-
 which uses the wasmtime cli, as above, via configiration found in this
-workspace's `.cargo/config`.
+workspace's `.cargo/config.toml`.
 
-By default, this script accesses the `wstd-example-bucket` in `us-west-2`.
-To change the bucket or region, use the `--bucket` and `--region` cli
-flags before the subcommand.
-
+By default, the subcommand `list` will be run, listing the contents of the
+bucket. To get an item from the bucket, use the subcommand `get <key> [-o
+<output>]`. Use `--help` when in doubt.
 
