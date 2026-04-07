@@ -1,7 +1,15 @@
 use super::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
 use std::cell::LazyCell;
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::cli::terminal_input::TerminalInput;
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::cli::terminal_output::TerminalOutput;
+
+#[cfg(feature = "wasip3")]
+use wasip3::cli::terminal_input::TerminalInput;
+#[cfg(feature = "wasip3")]
+use wasip3::cli::terminal_output::TerminalOutput;
 
 /// Use the program's stdin as an `AsyncInputStream`.
 #[derive(Debug)]
@@ -11,11 +19,23 @@ pub struct Stdin {
 }
 
 /// Get the program's stdin for use as an `AsyncInputStream`.
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 pub fn stdin() -> Stdin {
     let stream = AsyncInputStream::new(wasip2::cli::stdin::get_stdin());
     Stdin {
         stream,
         terminput: LazyCell::new(wasip2::cli::terminal_stdin::get_terminal_stdin),
+    }
+}
+
+/// Get the program's stdin for use as an `AsyncInputStream`.
+#[cfg(feature = "wasip3")]
+pub fn stdin() -> Stdin {
+    let (reader, _completion) = wasip3::cli::stdin::read_via_stream();
+    let stream = AsyncInputStream::new(reader);
+    Stdin {
+        stream,
+        terminput: LazyCell::new(wasip3::cli::terminal_stdin::get_terminal_stdin),
     }
 }
 
@@ -56,11 +76,27 @@ pub struct Stdout {
 }
 
 /// Get the program's stdout for use as an `AsyncOutputStream`.
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 pub fn stdout() -> Stdout {
     let stream = AsyncOutputStream::new(wasip2::cli::stdout::get_stdout());
     Stdout {
         stream,
         termoutput: LazyCell::new(wasip2::cli::terminal_stdout::get_terminal_stdout),
+    }
+}
+
+/// Get the program's stdout for use as an `AsyncOutputStream`.
+#[cfg(feature = "wasip3")]
+pub fn stdout() -> Stdout {
+    let (writer, reader) = wasip3::wit_stream::new::<u8>();
+    // Wire the reader end to the WASI stdout sink. The returned future resolves
+    // when the stream is fully consumed; we intentionally leak it so the pipe
+    // stays open for the lifetime of the program.
+    let _completion = wasip3::cli::stdout::write_via_stream(reader);
+    let stream = AsyncOutputStream::new(writer);
+    Stdout {
+        stream,
+        termoutput: LazyCell::new(wasip3::cli::terminal_stdout::get_terminal_stdout),
     }
 }
 
@@ -98,19 +134,32 @@ impl AsyncWrite for Stdout {
     }
 }
 
-/// Use the program's stdout as an `AsyncOutputStream`.
+/// Use the program's stderr as an `AsyncOutputStream`.
 #[derive(Debug)]
 pub struct Stderr {
     stream: AsyncOutputStream,
     termoutput: LazyCell<Option<TerminalOutput>>,
 }
 
-/// Get the program's stdout for use as an `AsyncOutputStream`.
+/// Get the program's stderr for use as an `AsyncOutputStream`.
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 pub fn stderr() -> Stderr {
     let stream = AsyncOutputStream::new(wasip2::cli::stderr::get_stderr());
     Stderr {
         stream,
         termoutput: LazyCell::new(wasip2::cli::terminal_stderr::get_terminal_stderr),
+    }
+}
+
+/// Get the program's stderr for use as an `AsyncOutputStream`.
+#[cfg(feature = "wasip3")]
+pub fn stderr() -> Stderr {
+    let (writer, reader) = wasip3::wit_stream::new::<u8>();
+    let _completion = wasip3::cli::stderr::write_via_stream(reader);
+    let stream = AsyncOutputStream::new(writer);
+    Stderr {
+        stream,
+        termoutput: LazyCell::new(wasip3::cli::terminal_stderr::get_terminal_stderr),
     }
 }
 

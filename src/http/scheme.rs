@@ -1,4 +1,8 @@
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::http::types::Scheme as WasiScheme;
+
+#[cfg(feature = "wasip3")]
+use wasip3::http::types::Scheme as WasiScheme;
 
 pub use http::uri::{InvalidUri, Scheme};
 use std::str::FromStr;

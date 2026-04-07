@@ -13,8 +13,10 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["json"]
+default = ["json", "wasip2"]
 json = ["dep:serde", "dep:serde_json"]
+wasip2 = ["dep:wasip2"]
+wasip3 = ["dep:wasip3", "dep:wit-bindgen"]
 
 [dependencies]
 anyhow.workspace = true
@@ -27,7 +29,9 @@ http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
 slab.workspace = true
-wasip2.workspace = true
+wasip2 = { workspace = true, optional = true }
+wasip3 = { workspace = true, optional = true }
+wit-bindgen = { workspace = true, optional = true }
 wstd-macro.workspace = true
 
 # optional
@@ -95,7 +99,9 @@ test-programs = { path = "test-programs" }
 tower-service = "0.3.3"
 ureq = { version = "3.1", default-features = false, features = ["json"] }
 wasip2 = "1.0"
-wstd = { path = ".", version = "=0.6.6" }
+wasip3 = "0.5"
+wit-bindgen = { version = "0.54", default-features = false, features = ["async", "async-spawn", "inter-task-wakeup"] }
+wstd = { path = ".", version = "=0.6.6", default-features = false }
 wstd-axum = { path = "./axum", version = "=0.6.6" }
 wstd-axum-macro = { path = "./axum/macro", version = "=0.6.6" }
 wstd-macro = { path = "./macro", version = "=0.6.6" }
@@ -103,5 +109,5 @@ wstd-macro = { path = "./macro", version = "=0.6.6" }
 [package.metadata.docs.rs]
 all-features = true
 targets = [
-    "wasm32-wasip2"
+    "wasm32-wasip2",
 ]

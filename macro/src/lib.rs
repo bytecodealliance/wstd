@@ -100,12 +100,6 @@ pub fn attr_macro_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 
-    let (run_async, run_await) = if input.sig.asyncness.is_some() {
-        (quote!(async), quote!(.await))
-    } else {
-        (quote!(), quote!())
-    };
-
     let output = &input.sig.output;
     let inputs = &input.sig.inputs;
     let name = &input.sig.ident;
@@ -120,63 +114,32 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
         .into();
     }
 
+    // Delegate to wstd's conditionally-compiled declarative macro.
+    // The `cfg` checks in `__http_server_export!` run in wstd's context,
+    // so consumers don't need to define wasip2/wasip3 features themselves.
+    //
+    // We use @async/@sync markers so the declarative macro can construct
+    // the handler call in its own hygiene context (avoiding variable name
+    // mismatches between proc macro and declarative macro scopes)
+    // NOTE: we can avoid this once wasm32-wasip3 is an available target
+    let asyncness = if input.sig.asyncness.is_some() {
+        quote!(@async)
+    } else {
+        quote!(@sync)
+    };
+
+    let run_async = if input.sig.asyncness.is_some() {
+        quote!(async)
+    } else {
+        quote!()
+    };
+
     quote! {
-        struct TheServer;
-
-        impl ::wstd::__internal::wasip2::exports::http::incoming_handler::Guest for TheServer {
-            fn handle(
-                request: ::wstd::__internal::wasip2::http::types::IncomingRequest,
-                response_out: ::wstd::__internal::wasip2::http::types::ResponseOutparam
-            ) {
-                #(#attrs)*
-                #vis #run_async fn __run(#inputs) #output {
-                    #body
-                }
-
-                let responder = ::wstd::http::server::Responder::new(response_out);
-                ::wstd::runtime::block_on(async move {
-                    match ::wstd::http::request::try_from_incoming(request) {
-                        Ok(request) => match __run(request) #run_await {
-                            Ok(response) => { responder.respond(response).await.unwrap() },
-                            Err(err) => responder.fail(err),
-                        }
-                        Err(err) => responder.fail(err),
-                    }
-                })
-            }
+        ::wstd::__http_server_export! {
+            #asyncness
+            { #(#attrs)* #vis #run_async fn __run(#inputs) #output { #body } }
         }
 
-        ::wstd::__internal::wasip2::http::proxy::export!(TheServer with_types_in ::wstd::__internal::wasip2);
-
-        // Provide an actual function named `main`.
-        //
-        // WASI HTTP server components don't use a traditional `main` function.
-        // They export a function named `handle` which takes a `Request`
-        // argument, and which may be called multiple times on the same
-        // instance. To let users write a familiar `fn main` in a file
-        // named src/main.rs, we provide this `wstd::http_server` macro, which
-        // transforms the user's `fn main` into the appropriate `handle`
-        // function.
-        //
-        // However, when the top-level file is named src/main.rs, rustc
-        // requires there to be a function named `main` somewhere in it. This
-        // requirement can be disabled using `#![no_main]`, however we can't
-        // use that automatically because macros can't contain inner
-        // attributes, and we don't want to require users to add `#![no_main]`
-        // in their own code.
-        //
-        // So, we include a definition of a function named `main` here, which
-        // isn't intended to ever be called, and exists just to satify the
-        // requirement for a `main` function.
-        //
-        // Users could use `#![no_main]` if they want to. Or, they could name
-        // their top-level file src/lib.rs and add
-        // ```toml
-        // [lib]
-        // crate-type = ["cdylib"]
-        // ```
-        // to their Cargo.toml. With either of these, this "main" function will
-        // be ignored as dead code.
         fn main() {
             unreachable!("HTTP server components should be run with `handle` rather than `run`")
         }

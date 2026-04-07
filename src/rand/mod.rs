@@ -1,5 +1,9 @@
 //! Random number generation.
 
+#[cfg(feature = "wasip3")]
+use wasip3::random;
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::random;
 
 /// Fill the slice with cryptographically secure random bytes.

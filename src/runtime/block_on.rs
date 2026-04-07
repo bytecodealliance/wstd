@@ -1,10 +1,14 @@
 use super::{REACTOR, Reactor};
 
 use std::future::Future;
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use std::pin::pin;
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use std::task::{Context, Poll, Waker};
 
-/// Start the event loop. Blocks until the future
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+/// Start the event loop. Blocks until the future completes.
 pub fn block_on<F>(fut: F) -> F::Output
 where
     F: Future,
@@ -61,4 +65,33 @@ where
             )
         }
     }
+}
+
+//
+// In WASI 0.3, async operations are natively async — there are no Pollables to
+// manage. The block_on loop just drains the ready list. When no tasks are ready,
+// the runtime is done (native async operations will re-schedule tasks when they
+// complete).
+
+#[cfg(feature = "wasip3")]
+/// Start the event loop. Blocks until the future completes.
+///
+/// Delegates to wit-bindgen's block_on which integrates with the component
+/// model's async runtime (waitable-set polling) for native p3 async support.
+pub fn block_on<F>(fut: F) -> F::Output
+where
+    F: Future + 'static,
+    F::Output: 'static,
+{
+    // Set up the reactor for spawn support
+    let reactor = Reactor::new();
+    let prev = REACTOR.replace(Some(reactor));
+    if prev.is_some() {
+        panic!("cannot wstd::runtime::block_on inside an existing block_on!")
+    }
+
+    let result = wit_bindgen::rt::async_support::block_on(fut);
+
+    REACTOR.replace(None);
+    result
 }

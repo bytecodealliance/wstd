@@ -1,10 +1,5 @@
-use crate::http::{
-    Error, HeaderMap,
-    error::Context as _,
-    fields::{header_map_from_wasi, header_map_to_wasi},
-};
-use crate::io::{AsyncInputStream, AsyncOutputStream};
-use crate::runtime::{AsyncPollable, Reactor, WaitFor};
+use crate::http::{Error, HeaderMap, error::Context as _};
+use crate::io::AsyncInputStream;
 
 pub use ::http_body::{Body as HttpBody, Frame, SizeHint};
 pub use bytes::Bytes;
@@ -12,12 +7,26 @@ pub use bytes::Bytes;
 use http::header::CONTENT_LENGTH;
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use std::fmt;
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+use crate::http::fields::{header_map_from_wasi, header_map_to_wasi};
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+use crate::io::AsyncOutputStream;
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use std::future::{Future, poll_fn};
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use std::pin::{Pin, pin};
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use std::task::{Context, Poll};
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+use crate::runtime::{AsyncPollable, Reactor, WaitFor};
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::http::types::{
     FutureTrailers, IncomingBody as WasiIncomingBody, OutgoingBody as WasiOutgoingBody,
 };
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::io::streams::{InputStream as WasiInputStream, StreamError};
 
 pub mod util {
@@ -60,8 +69,12 @@ pub struct Body(BodyInner);
 enum BodyInner {
     // a boxed http_body::Body impl
     Boxed(UnsyncBoxBody<Bytes, Error>),
-    // a body created from a wasi-http incoming-body (WasiIncomingBody)
+    // a body created from a wasi-http incoming-body (p2)
+    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
     Incoming(Incoming),
+    // a body created from a p3 StreamReader
+    #[cfg(feature = "wasip3")]
+    P3Stream(P3StreamBody),
     // a body in memory
     Complete {
         data: Bytes,
@@ -69,6 +82,7 @@ enum BodyInner {
     },
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl Body {
     pub(crate) async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
         match self.0 {
@@ -122,16 +136,44 @@ impl Body {
         }
     }
 
-    /// Convert this `Body` into an `UnsyncBoxBody<Bytes, Error>`, which
-    /// exists to implement the `http_body::Body` trait. Consume the contents
-    /// using `http_body_utils::BodyExt`, or anywhere else an impl of
-    /// `http_body::Body` is accepted.
+    pub(crate) fn from_incoming(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
+        Body(BodyInner::Incoming(Incoming { body, size_hint }))
+    }
+}
+
+#[cfg(feature = "wasip3")]
+impl Body {
+    pub(crate) fn from_p3_stream(
+        reader: wit_bindgen::rt::async_support::StreamReader<u8>,
+        size_hint: BodyHint,
+    ) -> Self {
+        Body(BodyInner::P3Stream(P3StreamBody {
+            reader: Some(reader),
+            size_hint,
+        }))
+    }
+}
+
+impl Body {
+    /// Convert this `Body` into an `UnsyncBoxBody<Bytes, Error>`.
     pub fn into_boxed_body(self) -> UnsyncBoxBody<Bytes, Error> {
         fn map_e(_: std::convert::Infallible) -> Error {
             unreachable!()
         }
         match self.0 {
+            #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
             BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
+            #[cfg(feature = "wasip3")]
+            BodyInner::P3Stream(p3) => {
+                // Convert p3 stream body to a boxed body
+                let stream = AsyncInputStream::new(p3.reader.unwrap());
+                use futures_lite::stream::StreamExt;
+                http_body_util::StreamBody::new(stream.into_stream().map(|res| {
+                    res.map(|bytevec| Frame::data(Bytes::from_owner(bytevec)))
+                        .map_err(Into::into)
+                }))
+                .boxed_unsync()
+            }
             BodyInner::Complete { data, trailers } => http_body_util::Full::new(data)
                 .map_err(map_e)
                 .with_trailers(async move { Ok(trailers).transpose() })
@@ -152,10 +194,39 @@ impl Body {
                     trailers: None,
                 };
                 std::mem::swap(inner, &mut prev);
+
+                // For p3 streams, read directly using the async read method
+                // instead of going through poll_next (which doesn't properly
+                // persist the read future across polls, causing hangs).
+                #[cfg(feature = "wasip3")]
+                if let BodyInner::P3Stream(p3) = prev {
+                    let mut stream = AsyncInputStream::new(p3.reader.unwrap());
+                    let mut all_data = Vec::new();
+                    let mut buf = vec![0u8; 64 * 1024];
+                    loop {
+                        match stream.read(&mut buf).await {
+                            Ok(0) => break,
+                            Ok(n) => all_data.extend_from_slice(&buf[..n]),
+                            Err(e) => return Err(Error::from(e).context("reading p3 body stream")),
+                        }
+                    }
+                    *inner = BodyInner::Complete {
+                        data: Bytes::from(all_data),
+                        trailers: None,
+                    };
+                    return Ok(match inner {
+                        BodyInner::Complete { data, .. } => &*data,
+                        _ => unreachable!(),
+                    });
+                }
+
                 let boxed_body = match prev {
+                    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
                     BodyInner::Incoming(i) => i.into_http_body().boxed_unsync(),
                     BodyInner::Boxed(b) => b,
                     BodyInner::Complete { .. } => unreachable!(),
+                    #[cfg(feature = "wasip3")]
+                    BodyInner::P3Stream(_) => unreachable!(),
                 };
                 let collected = boxed_body.collect().await?;
                 let trailers = collected.trailers().cloned();
@@ -180,7 +251,10 @@ impl Body {
         match &self.0 {
             BodyInner::Boxed(b) => b.size_hint().exact(),
             BodyInner::Complete { data, .. } => Some(data.len() as u64),
+            #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
             BodyInner::Incoming(i) => i.size_hint.content_length(),
+            #[cfg(feature = "wasip3")]
+            BodyInner::P3Stream(p3) => p3.size_hint.content_length(),
         }
     }
 
@@ -217,12 +291,7 @@ impl Body {
         serde_json::from_str(str).context("decoding body contents as json")
     }
 
-    pub(crate) fn from_incoming(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
-        Body(BodyInner::Incoming(Incoming { body, size_hint }))
-    }
-
-    /// Construct a `Body` backed by a `futures_lite::Stream` impl. The stream
-    /// will be polled as the body is sent.
+    /// Construct a `Body` backed by a `futures_lite::Stream` impl.
     pub fn from_stream<S>(stream: S) -> Self
     where
         S: futures_lite::Stream + Send + 'static,
@@ -323,46 +392,6 @@ impl From<crate::io::AsyncInputStream> for Body {
     }
 }
 
-#[derive(Debug)]
-struct Incoming {
-    body: WasiIncomingBody,
-    size_hint: BodyHint,
-}
-
-impl Incoming {
-    fn into_http_body(self) -> IncomingBody {
-        IncomingBody::new(self.body, self.size_hint)
-    }
-    async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
-        let in_body = self.body;
-        let in_stream =
-            AsyncInputStream::new(in_body.stream().expect("incoming body already read"));
-        let out_stream = AsyncOutputStream::new(
-            outgoing_body
-                .write()
-                .expect("outgoing body already written"),
-        );
-        in_stream.copy_to(&out_stream).await.map_err(|e| {
-            Error::from(e).context("copying incoming body stream to outgoing body stream")
-        })?;
-        drop(in_stream);
-        drop(out_stream);
-        let future_in_trailers = WasiIncomingBody::finish(in_body);
-        Reactor::current()
-            .schedule(future_in_trailers.subscribe())
-            .wait_for()
-            .await;
-        let in_trailers: Option<wasip2::http::types::Fields> = future_in_trailers
-            .get()
-            .expect("pollable ready")
-            .expect("got once")
-            .map_err(|e| Error::from(e).context("recieving incoming trailers"))?;
-        WasiOutgoingBody::finish(outgoing_body, in_trailers)
-            .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum BodyHint {
     ContentLength(u64),
@@ -397,12 +426,70 @@ impl fmt::Display for InvalidContentLength {
 }
 impl std::error::Error for InvalidContentLength {}
 
+#[cfg(feature = "wasip3")]
+struct P3StreamBody {
+    reader: Option<wit_bindgen::rt::async_support::StreamReader<u8>>,
+    size_hint: BodyHint,
+}
+
+#[cfg(feature = "wasip3")]
+impl fmt::Debug for P3StreamBody {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("P3StreamBody").finish()
+    }
+}
+
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[derive(Debug)]
+struct Incoming {
+    body: WasiIncomingBody,
+    size_hint: BodyHint,
+}
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+impl Incoming {
+    fn into_http_body(self) -> IncomingBody {
+        IncomingBody::new(self.body, self.size_hint)
+    }
+    async fn send(self, outgoing_body: WasiOutgoingBody) -> Result<(), Error> {
+        let in_body = self.body;
+        let in_stream =
+            AsyncInputStream::new(in_body.stream().expect("incoming body already read"));
+        let out_stream = AsyncOutputStream::new(
+            outgoing_body
+                .write()
+                .expect("outgoing body already written"),
+        );
+        in_stream.copy_to(&out_stream).await.map_err(|e| {
+            Error::from(e).context("copying incoming body stream to outgoing body stream")
+        })?;
+        drop(in_stream);
+        drop(out_stream);
+        let future_in_trailers = WasiIncomingBody::finish(in_body);
+        Reactor::current()
+            .schedule(future_in_trailers.subscribe())
+            .wait_for()
+            .await;
+        let in_trailers: Option<wasip2::http::types::Fields> = future_in_trailers
+            .get()
+            .expect("pollable ready")
+            .expect("got once")
+            .map_err(|e| Error::from(e).context("recieving incoming trailers"))?;
+        WasiOutgoingBody::finish(outgoing_body, in_trailers)
+            .map_err(|e| Error::from(e).context("finishing outgoing body"))?;
+        Ok(())
+    }
+}
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 #[derive(Debug)]
 pub struct IncomingBody {
     state: Option<Pin<Box<IncomingBodyState>>>,
     size_hint: BodyHint,
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl IncomingBody {
     fn new(body: WasiIncomingBody, size_hint: BodyHint) -> Self {
         Self {
@@ -421,6 +508,7 @@ impl IncomingBody {
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl HttpBody for IncomingBody {
     type Data = Bytes;
     type Error = Error;
@@ -476,6 +564,7 @@ impl HttpBody for IncomingBody {
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 pin_project_lite::pin_project! {
     #[project = IBSProj]
     #[derive(Debug)]
@@ -494,6 +583,7 @@ pin_project_lite::pin_project! {
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 #[derive(Debug)]
 struct BodyState {
     wait: Option<Pin<Box<WaitFor>>>,
@@ -501,8 +591,10 @@ struct BodyState {
     stream: WasiInputStream,
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 const MAX_FRAME_SIZE: u64 = 64 * 1024;
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl BodyState {
     fn poll_frame(
         mut self: Pin<&mut Self>,
@@ -547,6 +639,7 @@ impl BodyState {
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 #[derive(Debug)]
 struct TrailersState {
     wait: Option<Pin<Box<WaitFor>>>,
@@ -554,6 +647,7 @@ struct TrailersState {
     future_trailers: FutureTrailers,
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl TrailersState {
     fn new(future_trailers: FutureTrailers) -> Self {
         Self {

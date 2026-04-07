@@ -1,5 +1,7 @@
 [target.wasm32-wasip2]
 # wasmtime is given:
+# * p3 enabled for wasip3 component support (backwards compat with p2)
+# * http enabled for wasi-http tests
 # * AWS auth environment variables, for running the wstd-aws integration tests.
 # * . directory is available at .
-runner = "wasmtime run -Shttp --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY --env AWS_SESSION_TOKEN --dir .::."
+runner = "wasmtime run -Wcomponent-model-async -Wcomponent-model-async-builtins -Wcomponent-model-async-stackful -Sp3 -Shttp --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY --env AWS_SESSION_TOKEN --dir .::."

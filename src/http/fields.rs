@@ -1,11 +1,30 @@
 pub use http::header::{HeaderMap, HeaderName, HeaderValue};
 
 use super::{Error, error::Context};
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::http::types::Fields;
 
+#[cfg(feature = "wasip3")]
+use wasip3::http::types::Fields;
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 pub(crate) fn header_map_from_wasi(wasi_fields: Fields) -> Result<HeaderMap, Error> {
     let mut output = HeaderMap::new();
     for (key, value) in wasi_fields.entries() {
+        let key =
+            HeaderName::from_bytes(key.as_bytes()).with_context(|| format!("header name {key}"))?;
+        let value =
+            HeaderValue::from_bytes(&value).with_context(|| format!("header value for {key}"))?;
+        output.append(key, value);
+    }
+    Ok(output)
+}
+
+#[cfg(feature = "wasip3")]
+pub(crate) fn header_map_from_wasi(wasi_fields: Fields) -> Result<HeaderMap, Error> {
+    let mut output = HeaderMap::new();
+    for (key, value) in wasi_fields.copy_all() {
         let key =
             HeaderName::from_bytes(key.as_bytes()).with_context(|| format!("header name {key}"))?;
         let value =

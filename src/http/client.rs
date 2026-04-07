@@ -1,9 +1,5 @@
 use super::{Body, Error, Request, Response};
-use crate::http::request::try_into_outgoing;
-use crate::http::response::try_from_incoming;
-use crate::io::AsyncPollable;
 use crate::time::Duration;
-use wasip2::http::types::RequestOptions as WasiRequestOptions;
 
 /// An HTTP client.
 #[derive(Debug, Clone)]
@@ -24,32 +20,56 @@ impl Client {
     }
 
     /// Send an HTTP request.
+    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
     pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
+        use crate::http::request::try_into_outgoing;
+        use crate::http::response::try_from_incoming;
+        use crate::io::AsyncPollable;
         let (wasi_req, body) = try_into_outgoing(req)?;
         let body = body.into();
         let wasi_body = wasi_req.body().unwrap();
 
-        // 1. Start sending the request head
-        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?)?;
+        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options_p2()?)?;
 
-        let ((), body) = futures_lite::future::try_zip(
-            async move {
-                // 3. send the body:
-                body.send(wasi_body).await
-            },
-            async move {
-                // 4. Receive the response
+        let ((), body) =
+            futures_lite::future::try_zip(async move { body.send(wasi_body).await }, async move {
                 AsyncPollable::new(res.subscribe()).wait_for().await;
-
-                // NOTE: the first `unwrap` is to ensure readiness, the second `unwrap`
-                // is to trap if we try and get the response more than once. The final
-                // `?` is to raise the actual error if there is one.
                 let res = res.get().unwrap().unwrap()?;
                 try_from_incoming(res)
-            },
-        )
-        .await?;
+            })
+            .await?;
         Ok(body)
+    }
+
+    /// Send an HTTP request.
+    #[cfg(feature = "wasip3")]
+    pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
+        use crate::http::request::try_into_wasi_request;
+        use crate::http::response::try_from_wasi_response;
+
+        let parts = try_into_wasi_request(req, self.options.as_ref())?;
+
+        // Send body data through the stream writer
+        if let Some(mut body_writer) = parts.body_writer {
+            let mut body = parts.body;
+            let body_bytes = body.contents().await?;
+            if !body_bytes.is_empty() {
+                let remaining = body_writer.write_all(body_bytes.to_vec()).await;
+                if !remaining.is_empty() {
+                    return Err(anyhow::anyhow!("failed to write full request body"));
+                }
+            }
+            drop(body_writer);
+        }
+
+        let wasi_resp = wasip3::http::client::send(parts.request).await?;
+
+        // Create a completion future for consuming the response body
+        let (_completion_writer, completion_reader) =
+            wasip3::wit_future::new::<Result<(), super::ErrorCode>>(|| Ok(()));
+        drop(_completion_writer);
+
+        try_from_wasi_response(wasi_resp, completion_reader)
     }
 
     /// Set timeout on connecting to HTTP server
@@ -77,24 +97,31 @@ impl Client {
         }
     }
 
-    fn wasi_options(&self) -> Result<Option<WasiRequestOptions>, crate::http::Error> {
+    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+    fn wasi_options_p2(
+        &self,
+    ) -> Result<Option<wasip2::http::types::RequestOptions>, crate::http::Error> {
         self.options
             .as_ref()
-            .map(RequestOptions::to_wasi)
+            .map(RequestOptions::to_wasi_p2)
             .transpose()
     }
 }
 
+#[cfg(feature = "wasip3")]
+pub(crate) type P3RequestOptions = RequestOptions;
+
 #[derive(Default, Debug, Clone)]
-struct RequestOptions {
-    connect_timeout: Option<Duration>,
-    first_byte_timeout: Option<Duration>,
-    between_bytes_timeout: Option<Duration>,
+pub(crate) struct RequestOptions {
+    pub(crate) connect_timeout: Option<Duration>,
+    pub(crate) first_byte_timeout: Option<Duration>,
+    pub(crate) between_bytes_timeout: Option<Duration>,
 }
 
 impl RequestOptions {
-    fn to_wasi(&self) -> Result<WasiRequestOptions, crate::http::Error> {
-        let wasi = WasiRequestOptions::new();
+    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+    fn to_wasi_p2(&self) -> Result<wasip2::http::types::RequestOptions, crate::http::Error> {
+        let wasi = wasip2::http::types::RequestOptions::new();
         if let Some(timeout) = self.connect_timeout {
             wasi.set_connect_timeout(Some(timeout.0)).map_err(|()| {
                 anyhow::Error::msg(

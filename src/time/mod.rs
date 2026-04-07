@@ -7,33 +7,44 @@ mod instant;
 pub use duration::Duration;
 pub use instant::Instant;
 
-use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use crate::iter::AsyncIterator;
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::clocks::{
     monotonic_clock::{subscribe_duration, subscribe_instant},
     wall_clock,
 };
 
-use crate::{
-    iter::AsyncIterator,
-    runtime::{AsyncPollable, Reactor},
-};
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+use crate::runtime::{AsyncPollable, Reactor};
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+use pin_project_lite::pin_project;
+
+#[cfg(feature = "wasip3")]
+use wasip3::clocks::{monotonic_clock, system_clock};
+
 
 /// A measurement of the system clock, useful for talking to external entities
 /// like the file system or other processes. May be converted losslessly to a
 /// more useful `std::time::SystemTime` to provide more methods.
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub struct SystemTime(wall_clock::Datetime);
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl SystemTime {
     pub fn now() -> Self {
         Self(wall_clock::now())
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl From<SystemTime> for std::time::SystemTime {
     fn from(st: SystemTime) -> Self {
         std::time::SystemTime::UNIX_EPOCH
@@ -41,6 +52,35 @@ impl From<SystemTime> for std::time::SystemTime {
             + std::time::Duration::from_nanos(st.0.nanoseconds.into())
     }
 }
+
+#[cfg(feature = "wasip3")]
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub struct SystemTime(system_clock::Instant);
+
+#[cfg(feature = "wasip3")]
+impl SystemTime {
+    pub fn now() -> Self {
+        Self(system_clock::now())
+    }
+}
+
+#[cfg(feature = "wasip3")]
+impl From<SystemTime> for std::time::SystemTime {
+    fn from(st: SystemTime) -> Self {
+        // p3 system_clock::Instant has i64 seconds
+        if st.0.seconds >= 0 {
+            std::time::SystemTime::UNIX_EPOCH
+                + std::time::Duration::from_secs(st.0.seconds as u64)
+                + std::time::Duration::from_nanos(st.0.nanoseconds.into())
+        } else {
+            std::time::SystemTime::UNIX_EPOCH
+                - std::time::Duration::from_secs((-st.0.seconds) as u64)
+                + std::time::Duration::from_nanos(st.0.nanoseconds.into())
+        }
+    }
+}
+
 
 /// An async iterator representing notifications at fixed interval.
 pub fn interval(duration: Duration) -> Interval {
@@ -62,9 +102,12 @@ impl AsyncIterator for Interval {
     }
 }
 
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 #[derive(Debug)]
 pub struct Timer(Option<AsyncPollable>);
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl Timer {
     pub fn never() -> Timer {
         Timer(None)
@@ -86,6 +129,7 @@ impl Timer {
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 pin_project! {
     /// Future created by [`Timer::wait`]
     #[must_use = "futures do nothing unless polled or .awaited"]
@@ -95,6 +139,7 @@ pin_project! {
     }
 }
 
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 impl Future for Wait {
     type Output = Instant;
 
@@ -109,6 +154,75 @@ impl Future for Wait {
         }
     }
 }
+
+
+#[cfg(feature = "wasip3")]
+pub struct Timer {
+    kind: TimerKind,
+}
+
+#[cfg(feature = "wasip3")]
+enum TimerKind {
+    Never,
+    After(Duration),
+    At(Instant),
+}
+
+#[cfg(feature = "wasip3")]
+impl std::fmt::Debug for Timer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Timer").finish()
+    }
+}
+
+#[cfg(feature = "wasip3")]
+impl Timer {
+    pub fn never() -> Timer {
+        Timer {
+            kind: TimerKind::Never,
+        }
+    }
+    pub fn at(deadline: Instant) -> Timer {
+        Timer {
+            kind: TimerKind::At(deadline),
+        }
+    }
+    pub fn after(duration: Duration) -> Timer {
+        Timer {
+            kind: TimerKind::After(duration),
+        }
+    }
+    pub fn set_after(&mut self, duration: Duration) {
+        *self = Self::after(duration);
+    }
+    pub fn wait(&self) -> Wait {
+        let inner: Pin<Box<dyn Future<Output = ()>>> = match self.kind {
+            TimerKind::Never => Box::pin(std::future::pending()),
+            TimerKind::After(d) => Box::pin(monotonic_clock::wait_for(d.0)),
+            TimerKind::At(deadline) => Box::pin(monotonic_clock::wait_until(deadline.0)),
+        };
+        Wait { inner }
+    }
+}
+
+#[cfg(feature = "wasip3")]
+#[must_use = "futures do nothing unless polled or .awaited"]
+pub struct Wait {
+    inner: Pin<Box<dyn Future<Output = ()>>>,
+}
+
+#[cfg(feature = "wasip3")]
+impl Future for Wait {
+    type Output = Instant;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.inner.as_mut().poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(()) => Poll::Ready(Instant::now()),
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod test {

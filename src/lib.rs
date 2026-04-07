@@ -70,10 +70,17 @@ pub use wstd_macro::attr_macro_http_server as http_server;
 pub use wstd_macro::attr_macro_main as main;
 pub use wstd_macro::attr_macro_test as test;
 
-// Re-export the wasip2 crate for use only by `wstd-macro` macros. The proc
+// Re-export the wasi bindings crate for use only by `wstd-macro` macros. The proc
 // macros need to generate code that uses these definitions, but we don't want
 // to treat it as part of our public API with regards to semver, so we keep it
 // under `__internal` as well as doc(hidden) to indicate it is private.
+#[cfg(feature = "wasip3")]
+#[doc(hidden)]
+pub mod __internal {
+    pub use wasip3;
+}
+
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 #[doc(hidden)]
 pub mod __internal {
     pub use wasip2;

@@ -1,4 +1,8 @@
+#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
 use wasip2::http::types::Method as WasiMethod;
+
+#[cfg(feature = "wasip3")]
+use wasip3::http::types::Method as WasiMethod;
 
 pub use http::Method;
 use http::method::InvalidMethod;
