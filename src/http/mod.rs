@@ -27,11 +27,12 @@ pub mod server;
 // Conditionally-compiled declarative macro for HTTP server export
 //
 // The `#[wstd::http_server]` proc macro delegates to this declarative macro.
-// Because `#[macro_export]` macros are compiled in wstd's context, the `cfg`
-// checks here use wstd's own feature flags so consumers don't need to define
-// `wasip2`/`wasip3` features themselves.
+// Because `#[macro_export]` macros are compiled in wstd's context, the
+// `wstd_p2` / `wstd_p3` cfg aliases (defined in build.rs) are evaluated against
+// wstd's own features and target environment. Consumers don't need to define
+// any features themselves.
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __http_server_export {
@@ -91,7 +92,7 @@ macro_rules! __http_server_export {
     };
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __http_server_export {

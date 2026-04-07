@@ -20,7 +20,7 @@ impl Client {
     }
 
     /// Send an HTTP request.
-    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+    #[cfg(wstd_p2)]
     pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
         use crate::http::request::try_into_outgoing;
         use crate::http::response::try_from_incoming;
@@ -42,7 +42,7 @@ impl Client {
     }
 
     /// Send an HTTP request.
-    #[cfg(feature = "wasip3")]
+    #[cfg(wstd_p3)]
     pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
         use crate::http::request::try_into_wasi_request;
         use crate::http::response::try_from_wasi_response;
@@ -97,7 +97,7 @@ impl Client {
         }
     }
 
-    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+    #[cfg(wstd_p2)]
     fn wasi_options_p2(
         &self,
     ) -> Result<Option<wasip2::http::types::RequestOptions>, crate::http::Error> {
@@ -108,7 +108,7 @@ impl Client {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub(crate) type P3RequestOptions = RequestOptions;
 
 #[derive(Default, Debug, Clone)]
@@ -119,7 +119,7 @@ pub(crate) struct RequestOptions {
 }
 
 impl RequestOptions {
-    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+    #[cfg(wstd_p2)]
     fn to_wasi_p2(&self) -> Result<wasip2::http::types::RequestOptions, crate::http::Error> {
         let wasi = wasip2::http::types::RequestOptions::new();
         if let Some(timeout) = self.connect_timeout {

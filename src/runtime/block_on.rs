@@ -1,13 +1,12 @@
 use super::{REACTOR, Reactor};
 
 use std::future::Future;
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use std::pin::pin;
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use std::task::{Context, Poll, Waker};
 
-
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 /// Start the event loop. Blocks until the future completes.
 pub fn block_on<F>(fut: F) -> F::Output
 where
@@ -73,7 +72,7 @@ where
 // the runtime is done (native async operations will re-schedule tasks when they
 // complete).
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 /// Start the event loop. Blocks until the future completes.
 ///
 /// Delegates to wit-bindgen's block_on which integrates with the component

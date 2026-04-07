@@ -1,14 +1,14 @@
 use super::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
 use std::cell::LazyCell;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::cli::terminal_input::TerminalInput;
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::cli::terminal_output::TerminalOutput;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use wasip3::cli::terminal_input::TerminalInput;
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use wasip3::cli::terminal_output::TerminalOutput;
 
 /// Use the program's stdin as an `AsyncInputStream`.
@@ -19,7 +19,7 @@ pub struct Stdin {
 }
 
 /// Get the program's stdin for use as an `AsyncInputStream`.
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub fn stdin() -> Stdin {
     let stream = AsyncInputStream::new(wasip2::cli::stdin::get_stdin());
     Stdin {
@@ -29,7 +29,7 @@ pub fn stdin() -> Stdin {
 }
 
 /// Get the program's stdin for use as an `AsyncInputStream`.
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub fn stdin() -> Stdin {
     let (reader, _completion) = wasip3::cli::stdin::read_via_stream();
     let stream = AsyncInputStream::new(reader);
@@ -76,7 +76,7 @@ pub struct Stdout {
 }
 
 /// Get the program's stdout for use as an `AsyncOutputStream`.
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub fn stdout() -> Stdout {
     let stream = AsyncOutputStream::new(wasip2::cli::stdout::get_stdout());
     Stdout {
@@ -86,7 +86,7 @@ pub fn stdout() -> Stdout {
 }
 
 /// Get the program's stdout for use as an `AsyncOutputStream`.
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub fn stdout() -> Stdout {
     let (writer, reader) = wasip3::wit_stream::new::<u8>();
     // Wire the reader end to the WASI stdout sink. The returned future resolves
@@ -142,7 +142,7 @@ pub struct Stderr {
 }
 
 /// Get the program's stderr for use as an `AsyncOutputStream`.
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub fn stderr() -> Stderr {
     let stream = AsyncOutputStream::new(wasip2::cli::stderr::get_stderr());
     Stderr {
@@ -152,7 +152,7 @@ pub fn stderr() -> Stderr {
 }
 
 /// Get the program's stderr for use as an `AsyncOutputStream`.
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub fn stderr() -> Stderr {
     let (writer, reader) = wasip3::wit_stream::new::<u8>();
     let _completion = wasip3::cli::stderr::write_via_stream(reader);

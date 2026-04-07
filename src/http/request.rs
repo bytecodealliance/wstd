@@ -9,13 +9,12 @@ use super::{
 
 pub use http::request::{Builder, Request};
 
-
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::http::outgoing_handler::OutgoingRequest;
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::http::types::IncomingRequest;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub(crate) fn try_into_outgoing<T>(request: Request<T>) -> Result<(OutgoingRequest, T), Error> {
     let wasi_req = OutgoingRequest::new(header_map_to_wasi(request.headers())?);
 
@@ -56,7 +55,7 @@ pub(crate) fn try_into_outgoing<T>(request: Request<T>) -> Result<(OutgoingReque
 
 /// This is used by the `http_server` macro.
 #[doc(hidden)]
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub fn try_from_incoming(incoming: IncomingRequest) -> Result<Request<Body>, Error> {
     let headers: HeaderMap = header_map_from_wasi(incoming.headers())
         .context("headers provided by wasi rejected by http::HeaderMap")?;
@@ -110,14 +109,13 @@ pub fn try_from_incoming(incoming: IncomingRequest) -> Result<Request<Body>, Err
     request.body(body).context("building request from wasi")
 }
 
-
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use wasip3::http::types::{
     Request as WasiRequest, RequestOptions as WasiRequestOptions, Scheme as WasiScheme,
 };
 
 /// Result of converting an http::Request into a p3 WASI Request.
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub(crate) struct WasiRequestParts {
     pub request: WasiRequest,
     pub body: Body,
@@ -126,7 +124,7 @@ pub(crate) struct WasiRequestParts {
 }
 
 /// Convert an http::Request into a p3 WASI Request for sending.
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub(crate) fn try_into_wasi_request<T: Into<Body>>(
     request: Request<T>,
     request_options: Option<&super::client::P3RequestOptions>,
@@ -204,7 +202,7 @@ pub(crate) fn try_into_wasi_request<T: Into<Body>>(
 
 /// Convert a p3 WASI Request into an http::Request (for the server handler).
 #[doc(hidden)]
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub fn try_from_wasi_request(
     incoming: WasiRequest,
     completion: wit_bindgen::rt::async_support::FutureReader<Result<(), ErrorCode>>,

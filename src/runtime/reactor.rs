@@ -3,7 +3,7 @@
 // It maintains a Slab of Pollables, a map of waiters, and a ready list of
 // runnables.
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 mod p2 {
     use super::super::REACTOR;
 
@@ -467,7 +467,7 @@ mod p2 {
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use p2::*;
 
 //
@@ -475,7 +475,7 @@ pub use p2::*;
 // support, so there is no need to manage Pollables. The reactor only manages a
 // ready list of runnables for cooperative multitasking.
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 mod p3 {
     use super::super::REACTOR;
 
@@ -564,5 +564,5 @@ mod p3 {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub use p3::*;

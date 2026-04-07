@@ -1,4 +1,4 @@
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 mod p2 {
     use crate::io::{AsyncPollable, AsyncRead, AsyncWrite};
     use crate::runtime::WaitFor;
@@ -308,10 +308,10 @@ mod p2 {
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use p2::*;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 mod p3 {
     use crate::io::{AsyncRead, AsyncWrite};
     use std::pin::Pin;
@@ -554,5 +554,5 @@ mod p3 {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub use p3::*;

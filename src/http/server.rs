@@ -18,8 +18,7 @@
 //! [`Response`]: crate::http::Response
 //! [`http_server`]: crate::http_server
 
-
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 mod p2 {
     use crate::http::{Body, Error, Response, error::ErrorCode, fields::header_map_to_wasi};
     use http::header::CONTENT_LENGTH;
@@ -80,17 +79,17 @@ mod p2 {
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use p2::*;
 
 // In p3, the handler trait is `async fn handle(Request) -> Result<Response, ErrorCode>`.
 // The macro generates the appropriate code. No Responder/outparam pattern needed.
 
 // p3 server utilities for the macro
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub use p3::*;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 mod p3 {
     use crate::http::{Body, Error, Response, error::ErrorCode, fields::header_map_to_wasi};
     use http::header::CONTENT_LENGTH;

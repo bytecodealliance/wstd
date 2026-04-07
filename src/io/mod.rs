@@ -9,7 +9,7 @@ mod stdio;
 mod streams;
 mod write;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use crate::runtime::AsyncPollable;
 pub use copy::*;
 pub use cursor::*;

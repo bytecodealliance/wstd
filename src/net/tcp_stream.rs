@@ -4,7 +4,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use super::to_io_err;
 use crate::io::{self, AsyncInputStream, AsyncOutputStream};
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 mod p2 {
     use super::*;
     use crate::runtime::AsyncPollable;
@@ -189,10 +189,10 @@ mod p2 {
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use p2::*;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 mod p3 {
     use super::*;
     use wasip3::sockets::types::{IpAddressFamily, IpSocketAddress, Ipv4SocketAddress, TcpSocket};
@@ -325,5 +325,5 @@ mod p3 {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub use p3::*;

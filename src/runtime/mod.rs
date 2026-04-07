@@ -15,7 +15,7 @@ pub use block_on::block_on;
 pub use reactor::Reactor;
 use std::cell::RefCell;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use reactor::{AsyncPollable, WaitFor};
 
 // There are no threads in WASI, so this is just a safe way to thread a single reactor to all

@@ -1,7 +1,7 @@
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::http::types::Scheme as WasiScheme;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use wasip3::http::types::Scheme as WasiScheme;
 
 pub use http::uri::{InvalidUri, Scheme};

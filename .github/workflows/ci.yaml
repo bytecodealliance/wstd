@@ -55,7 +55,7 @@ jobs:
       run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 -- --nocapture
 
     - name: wstd tests (wasip3)
-      run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 --no-default-features --features wasip3 -- --nocapture
+      run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 --no-default-features --features wasip3,json -- --nocapture
 
     - name: test-programs tests
       run: cargo test -p test-programs -- --nocapture

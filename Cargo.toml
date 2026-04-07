@@ -18,6 +18,9 @@ json = ["dep:serde", "dep:serde_json"]
 wasip2 = ["dep:wasip2"]
 wasip3 = ["dep:wasip3", "dep:wit-bindgen"]
 
+[build-dependencies]
+cfg_aliases = "0.2"
+
 [dependencies]
 anyhow.workspace = true
 async-task.workspace = true
@@ -37,6 +40,12 @@ wstd-macro.workspace = true
 # optional
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+
+# Auto-pull wasip3 deps when targeting wasm32-wasip3 so users don't need
+# to also pass --features wasip3.
+[target.'cfg(all(target_os = "wasi", target_env = "p3"))'.dependencies]
+wasip3 = { workspace = true }
+wit-bindgen = { workspace = true }
 
 [dev-dependencies]
 anyhow.workspace = true

@@ -8,7 +8,7 @@ mod tcp_stream;
 pub use tcp_listener::*;
 pub use tcp_stream::*;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 fn to_io_err(err: wasip2::sockets::network::ErrorCode) -> io::Error {
     use wasip2::sockets::network::ErrorCode;
     match err {
@@ -29,7 +29,7 @@ fn to_io_err(err: wasip2::sockets::network::ErrorCode) -> io::Error {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 fn to_io_err(err: wasip3::sockets::types::ErrorCode) -> io::Error {
     use wasip3::sockets::types::ErrorCode;
     match err {

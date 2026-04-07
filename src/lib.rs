@@ -74,13 +74,18 @@ pub use wstd_macro::attr_macro_test as test;
 // macros need to generate code that uses these definitions, but we don't want
 // to treat it as part of our public API with regards to semver, so we keep it
 // under `__internal` as well as doc(hidden) to indicate it is private.
-#[cfg(feature = "wasip3")]
+//
+// `wstd_p2` and `wstd_p3` are cfg aliases defined in build.rs that dispatch on
+// either the explicit feature flag or the target environment. When the
+// `wasm32-wasip3` target is used, `target_env = "p3"` is true and consumers
+// don't need to set the wasip3 feature manually.
+#[cfg(wstd_p3)]
 #[doc(hidden)]
 pub mod __internal {
     pub use wasip3;
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 #[doc(hidden)]
 pub mod __internal {
     pub use wasip2;

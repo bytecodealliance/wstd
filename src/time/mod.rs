@@ -13,38 +13,37 @@ use std::task::{Context, Poll};
 
 use crate::iter::AsyncIterator;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::clocks::{
     monotonic_clock::{subscribe_duration, subscribe_instant},
     wall_clock,
 };
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use crate::runtime::{AsyncPollable, Reactor};
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use pin_project_lite::pin_project;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use wasip3::clocks::{monotonic_clock, system_clock};
-
 
 /// A measurement of the system clock, useful for talking to external entities
 /// like the file system or other processes. May be converted losslessly to a
 /// more useful `std::time::SystemTime` to provide more methods.
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub struct SystemTime(wall_clock::Datetime);
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 impl SystemTime {
     pub fn now() -> Self {
         Self(wall_clock::now())
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 impl From<SystemTime> for std::time::SystemTime {
     fn from(st: SystemTime) -> Self {
         std::time::SystemTime::UNIX_EPOCH
@@ -53,19 +52,19 @@ impl From<SystemTime> for std::time::SystemTime {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub struct SystemTime(system_clock::Instant);
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 impl SystemTime {
     pub fn now() -> Self {
         Self(system_clock::now())
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 impl From<SystemTime> for std::time::SystemTime {
     fn from(st: SystemTime) -> Self {
         // p3 system_clock::Instant has i64 seconds
@@ -80,7 +79,6 @@ impl From<SystemTime> for std::time::SystemTime {
         }
     }
 }
-
 
 /// An async iterator representing notifications at fixed interval.
 pub fn interval(duration: Duration) -> Interval {
@@ -102,12 +100,11 @@ impl AsyncIterator for Interval {
     }
 }
 
-
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 #[derive(Debug)]
 pub struct Timer(Option<AsyncPollable>);
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 impl Timer {
     pub fn never() -> Timer {
         Timer(None)
@@ -129,7 +126,7 @@ impl Timer {
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pin_project! {
     /// Future created by [`Timer::wait`]
     #[must_use = "futures do nothing unless polled or .awaited"]
@@ -139,7 +136,7 @@ pin_project! {
     }
 }
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 impl Future for Wait {
     type Output = Instant;
 
@@ -155,27 +152,26 @@ impl Future for Wait {
     }
 }
 
-
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub struct Timer {
     kind: TimerKind,
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 enum TimerKind {
     Never,
     After(Duration),
     At(Instant),
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 impl std::fmt::Debug for Timer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Timer").finish()
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 impl Timer {
     pub fn never() -> Timer {
         Timer {
@@ -205,13 +201,13 @@ impl Timer {
     }
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 #[must_use = "futures do nothing unless polled or .awaited"]
 pub struct Wait {
     inner: Pin<Box<dyn Future<Output = ()>>>,
 }
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 impl Future for Wait {
     type Output = Instant;
 
@@ -222,7 +218,6 @@ impl Future for Wait {
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {

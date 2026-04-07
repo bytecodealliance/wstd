@@ -7,10 +7,10 @@ pub use anyhow::Context;
 pub use http::header::{InvalidHeaderName, InvalidHeaderValue};
 pub use http::method::InvalidMethod;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub use wasip2::http::types::{ErrorCode, HeaderError};
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub use wasip3::http::types::{ErrorCode, HeaderError};
 
 pub type Error = anyhow::Error;

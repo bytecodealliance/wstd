@@ -6,11 +6,10 @@ use crate::http::fields::{HeaderMap, header_map_from_wasi};
 
 pub use http::response::{Builder, Response};
 
-
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 use wasip2::http::types::IncomingResponse;
 
-#[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+#[cfg(wstd_p2)]
 pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<Body>, Error> {
     let headers: HeaderMap = header_map_from_wasi(incoming.headers())?;
     let status = StatusCode::from_u16(incoming.status())
@@ -29,13 +28,12 @@ pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<B
         .expect("response builder should not error"))
 }
 
-
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use crate::http::error::ErrorCode;
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 use wasip3::http::types::Response as WasiResponse;
 
-#[cfg(feature = "wasip3")]
+#[cfg(wstd_p3)]
 pub(crate) fn try_from_wasi_response(
     incoming: WasiResponse,
     completion: wit_bindgen::rt::async_support::FutureReader<Result<(), ErrorCode>>,

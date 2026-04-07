@@ -8,7 +8,7 @@ where
 {
     // Optimized path when we have an `AsyncInputStream` and an
     // `AsyncOutputStream` (p2 only — p2 can use wasi splice).
-    #[cfg(all(feature = "wasip2", not(feature = "wasip3")))]
+    #[cfg(wstd_p2)]
     if let Some(reader) = reader.as_async_input_stream()
         && let Some(writer) = writer.as_async_output_stream()
     {
