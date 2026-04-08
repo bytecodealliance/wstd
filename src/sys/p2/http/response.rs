@@ -1,9 +1,9 @@
 use http::StatusCode;
 use wasip2::http::types::IncomingResponse;
 
+use super::fields::{HeaderMap, header_map_from_wasi};
 use crate::http::body::{Body, BodyHint};
 use crate::http::error::Error;
-use super::fields::{HeaderMap, header_map_from_wasi};
 
 pub use http::response::{Builder, Response};
 

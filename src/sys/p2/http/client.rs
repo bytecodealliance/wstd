@@ -1,6 +1,6 @@
-use crate::http::{Body, Error, Request, Response};
 use super::request::try_into_outgoing;
 use super::response::try_from_incoming;
+use crate::http::{Body, Error, Request, Response};
 use crate::io::AsyncPollable;
 use crate::time::Duration;
 use wasip2::http::types::RequestOptions as WasiRequestOptions;
