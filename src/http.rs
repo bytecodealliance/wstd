@@ -3,15 +3,15 @@
 pub use http::status::StatusCode;
 pub use http::uri::{Authority, PathAndQuery, Uri};
 
-#[doc(inline)]
-pub use body::{Body, util::BodyExt};
 pub use crate::sys::http::client::Client;
-pub use error::{Error, ErrorCode, Result};
 pub use crate::sys::http::fields::{HeaderMap, HeaderName, HeaderValue};
 pub use crate::sys::http::method::Method;
+pub use crate::sys::http::scheme::{InvalidUri, Scheme};
+#[doc(inline)]
+pub use body::{Body, util::BodyExt};
+pub use error::{Error, ErrorCode, Result};
 pub use request::Request;
 pub use response::Response;
-pub use crate::sys::http::scheme::{InvalidUri, Scheme};
 
 pub mod body {
     //! HTTP body types.
@@ -24,10 +24,10 @@ pub mod error {
     //! There are various concrete error types
 
     pub use crate::http::body::InvalidContentLength;
+    pub use crate::sys::http::{ErrorCode, HeaderError};
     pub use anyhow::Context;
     pub use http::header::{InvalidHeaderName, InvalidHeaderValue};
     pub use http::method::InvalidMethod;
-    pub use crate::sys::http::{ErrorCode, HeaderError};
 
     pub type Error = anyhow::Error;
     /// The `http` result type.

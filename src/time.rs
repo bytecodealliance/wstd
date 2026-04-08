@@ -14,10 +14,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::{
-    iter::AsyncIterator,
-    runtime::AsyncPollable,
-};
+use crate::{iter::AsyncIterator, runtime::AsyncPollable};
 
 pub use crate::sys::time::SystemTime;
 
