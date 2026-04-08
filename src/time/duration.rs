@@ -1,7 +1,6 @@
 use super::{Instant, Wait};
 use std::future::IntoFuture;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
-use wasip2::clocks::monotonic_clock;
 
 /// A Duration type to represent a span of time, typically used for system
 /// timeouts.
@@ -10,7 +9,7 @@ use wasip2::clocks::monotonic_clock;
 /// without coherence issues, just like if we were implementing this in the
 /// stdlib.
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Copy)]
-pub struct Duration(pub(crate) monotonic_clock::Duration);
+pub struct Duration(pub(crate) crate::sys::time::MonotonicDuration);
 impl Duration {
     /// Creates a new `Duration` from the specified number of whole seconds and
     /// additional nanoseconds.

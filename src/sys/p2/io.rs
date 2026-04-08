@@ -1,5 +1,5 @@
-use super::{AsyncPollable, AsyncRead, AsyncWrite};
-use crate::runtime::WaitFor;
+use crate::io::{AsyncRead, AsyncWrite};
+use crate::runtime::{AsyncPollable, WaitFor};
 use std::future::{Future, poll_fn};
 use std::pin::Pin;
 use std::sync::{Mutex, OnceLock};
@@ -26,7 +26,7 @@ impl AsyncInputStream {
             stream,
         }
     }
-    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<()> {
+    pub(crate) fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<()> {
         // Lazily initialize the AsyncPollable
         let subscription = self
             .subscription
@@ -43,7 +43,7 @@ impl AsyncInputStream {
         }
     }
     /// Await for read readiness.
-    async fn ready(&self) {
+    pub(crate) async fn ready(&self) {
         poll_fn(|cx| self.poll_ready(cx)).await
     }
     /// Asynchronously read from the input stream.
@@ -233,7 +233,7 @@ impl AsyncOutputStream {
         }
     }
     /// Await write readiness.
-    async fn ready(&self) {
+    pub(crate) async fn ready(&self) {
         // Lazily initialize the AsyncPollable
         let subscription = self
             .subscription

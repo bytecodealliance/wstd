@@ -6,7 +6,7 @@ pub use crate::http::body::InvalidContentLength;
 pub use anyhow::Context;
 pub use http::header::{InvalidHeaderName, InvalidHeaderValue};
 pub use http::method::InvalidMethod;
-pub use wasip2::http::types::{ErrorCode, HeaderError};
+pub use crate::sys::http::{ErrorCode, HeaderError};
 
 pub type Error = anyhow::Error;
 /// The `http` result type.

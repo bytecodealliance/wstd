@@ -1,4 +1,4 @@
-use super::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
+use crate::io::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
 use std::cell::LazyCell;
 use wasip2::cli::terminal_input::TerminalInput;
 use wasip2::cli::terminal_output::TerminalOutput;

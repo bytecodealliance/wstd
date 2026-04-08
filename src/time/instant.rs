@@ -1,7 +1,6 @@
 use super::{Duration, Wait};
 use std::future::IntoFuture;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
-use wasip2::clocks::monotonic_clock;
 
 /// A measurement of a monotonically nondecreasing clock. Opaque and useful only
 /// with Duration.
@@ -10,7 +9,7 @@ use wasip2::clocks::monotonic_clock;
 /// without coherence issues, just like if we were implementing this in the
 /// stdlib.
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Copy)]
-pub struct Instant(pub(crate) monotonic_clock::Instant);
+pub struct Instant(pub(crate) crate::sys::time::MonotonicInstant);
 
 impl Instant {
     /// Returns an instant corresponding to "now".
@@ -24,7 +23,7 @@ impl Instant {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        Instant(wasip2::clocks::monotonic_clock::now())
+        Instant(crate::sys::time::now())
     }
 
     /// Returns the amount of time elapsed from another instant to this one, or zero duration if

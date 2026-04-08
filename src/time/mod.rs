@@ -11,36 +11,13 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use wasip2::clocks::{
-    monotonic_clock::{subscribe_duration, subscribe_instant},
-    wall_clock,
-};
 
 use crate::{
     iter::AsyncIterator,
-    runtime::{AsyncPollable, Reactor},
+    runtime::AsyncPollable,
 };
 
-/// A measurement of the system clock, useful for talking to external entities
-/// like the file system or other processes. May be converted losslessly to a
-/// more useful `std::time::SystemTime` to provide more methods.
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-pub struct SystemTime(wall_clock::Datetime);
-
-impl SystemTime {
-    pub fn now() -> Self {
-        Self(wall_clock::now())
-    }
-}
-
-impl From<SystemTime> for std::time::SystemTime {
-    fn from(st: SystemTime) -> Self {
-        std::time::SystemTime::UNIX_EPOCH
-            + std::time::Duration::from_secs(st.0.seconds)
-            + std::time::Duration::from_nanos(st.0.nanoseconds.into())
-    }
-}
+pub use crate::sys::time::SystemTime;
 
 /// An async iterator representing notifications at fixed interval.
 pub fn interval(duration: Duration) -> Interval {
@@ -70,11 +47,11 @@ impl Timer {
         Timer(None)
     }
     pub fn at(deadline: Instant) -> Timer {
-        let pollable = Reactor::current().schedule(subscribe_instant(deadline.0));
+        let pollable = crate::sys::time::subscribe_at(deadline.0);
         Timer(Some(pollable))
     }
     pub fn after(duration: Duration) -> Timer {
-        let pollable = Reactor::current().schedule(subscribe_duration(duration.0));
+        let pollable = crate::sys::time::subscribe_after(duration.0);
         Timer(Some(pollable))
     }
     pub fn set_after(&mut self, duration: Duration) {

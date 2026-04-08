@@ -1,0 +1,29 @@
+use http::StatusCode;
+use wasip2::http::types::IncomingResponse;
+
+use crate::http::body::{Body, BodyHint};
+use crate::http::error::Error;
+use super::fields::{HeaderMap, header_map_from_wasi};
+
+pub use http::response::{Builder, Response};
+
+pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<Body>, Error> {
+    let headers: HeaderMap = header_map_from_wasi(incoming.headers())?;
+    // TODO: Does WASI guarantee that the incoming status is valid?
+    let status = StatusCode::from_u16(incoming.status())
+        .map_err(|err| anyhow::anyhow!("wasi provided invalid status code ({err})"))?;
+
+    let hint = BodyHint::from_headers(&headers)?;
+    // `body_stream` is a child of `incoming_body` which means we cannot
+    // drop the parent before we drop the child
+    let incoming_body = incoming
+        .consume()
+        .expect("cannot call `consume` twice on incoming response");
+    let body = Body::from_incoming(incoming_body, hint);
+
+    let mut builder = Response::builder().status(status);
+    *builder.headers_mut().expect("builder has not errored") = headers;
+    Ok(builder
+        .body(body)
+        .expect("response builder should not error"))
+}
