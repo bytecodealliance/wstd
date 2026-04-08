@@ -17,8 +17,11 @@ pub fn now() -> MonotonicInstant {
     monotonic_clock::now()
 }
 
-/// A measurement of the system clock.
+/// A measurement of the system clock, useful for talking to external entities
+/// like the file system or other processes. May be converted losslessly to a
+/// more useful `std::time::SystemTime` to provide more methods.
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct SystemTime(wall_clock::Datetime);
 
 impl SystemTime {

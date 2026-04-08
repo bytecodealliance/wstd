@@ -14,7 +14,7 @@ use std::future::Future;
 use std::pin::pin;
 use std::task::{Context, Poll, Waker};
 
-/// Start the event loop. Blocks until the future completes.
+/// Start the event loop. Blocks until the future
 pub fn block_on<F>(fut: F) -> F::Output
 where
     F: Future,

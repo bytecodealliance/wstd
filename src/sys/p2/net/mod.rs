@@ -1,3 +1,5 @@
+//! Async network abstractions.
+
 use std::io::{self, ErrorKind};
 use wasip2::sockets::network::ErrorCode;
 
@@ -7,7 +9,7 @@ mod tcp_stream;
 pub use tcp_listener::*;
 pub use tcp_stream::*;
 
-pub(crate) fn to_io_err(err: ErrorCode) -> io::Error {
+fn to_io_err(err: ErrorCode) -> io::Error {
     match err {
         ErrorCode::Unknown => ErrorKind::Other.into(),
         ErrorCode::AccessDenied => ErrorKind::PermissionDenied.into(),

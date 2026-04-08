@@ -53,13 +53,13 @@ pin_project! {
         future: F,
         #[pin]
         deadline: D,
-        state: DelayState,
+        state: State,
     }
 }
 
 /// The internal state
 #[derive(Debug)]
-enum DelayState {
+enum State {
     Started,
     PollFuture,
     Completed,
@@ -70,7 +70,7 @@ impl<F, D> Delay<F, D> {
         Self {
             future,
             deadline,
-            state: DelayState::Started,
+            state: State::Started,
         }
     }
 }
@@ -82,16 +82,16 @@ impl<F: Future, D: Future> Future for Delay<F, D> {
         let mut this = self.project();
         loop {
             match this.state {
-                DelayState::Started => {
+                State::Started => {
                     ready!(this.deadline.as_mut().poll(cx));
-                    *this.state = DelayState::PollFuture;
+                    *this.state = State::PollFuture;
                 }
-                DelayState::PollFuture => {
+                State::PollFuture => {
                     let value = ready!(this.future.as_mut().poll(cx));
-                    *this.state = DelayState::Completed;
+                    *this.state = State::Completed;
                     return Poll::Ready(value);
                 }
-                DelayState::Completed => panic!("future polled after completing"),
+                State::Completed => panic!("future polled after completing"),
             }
         }
     }

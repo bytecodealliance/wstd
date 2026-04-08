@@ -26,7 +26,7 @@ impl AsyncInputStream {
             stream,
         }
     }
-    pub(crate) fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<()> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<()> {
         // Lazily initialize the AsyncPollable
         let subscription = self
             .subscription
@@ -43,7 +43,7 @@ impl AsyncInputStream {
         }
     }
     /// Await for read readiness.
-    pub(crate) async fn ready(&self) {
+    async fn ready(&self) {
         poll_fn(|cx| self.poll_ready(cx)).await
     }
     /// Asynchronously read from the input stream.
@@ -233,7 +233,7 @@ impl AsyncOutputStream {
         }
     }
     /// Await write readiness.
-    pub(crate) async fn ready(&self) {
+    async fn ready(&self) {
         // Lazily initialize the AsyncPollable
         let subscription = self
             .subscription

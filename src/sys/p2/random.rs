@@ -1,3 +1,5 @@
+//! Random number generation.
+
 use wasip2::random;
 
 /// Fill the slice with cryptographically secure random bytes.

@@ -12,6 +12,8 @@ use wasip2::http::types::IncomingRequest;
 
 pub use http::request::{Builder, Request};
 
+// TODO: go back and add json stuff???
+
 pub(crate) fn try_into_outgoing<T>(request: Request<T>) -> Result<(OutgoingRequest, T), Error> {
     let wasi_req = OutgoingRequest::new(header_map_to_wasi(request.headers())?);
 
