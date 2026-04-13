@@ -7,6 +7,7 @@ mod read;
 mod seek;
 mod write;
 
+#[cfg(wstd_p2)]
 pub use crate::runtime::AsyncPollable;
 pub use crate::sys::io::*;
 pub use crate::sys::stdio::*;

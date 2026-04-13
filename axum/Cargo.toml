@@ -10,10 +10,15 @@ categories.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["wasip2"]
+wasip2 = ["wstd/wasip2"]
+wasip3 = ["wstd/wasip3"]
+
 [dependencies]
 axum.workspace = true
 tower-service.workspace = true
-wstd.workspace = true
+wstd = { workspace = true, default-features = false }
 wstd-axum-macro.workspace = true
 
 [dev-dependencies]

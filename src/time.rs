@@ -8,13 +8,17 @@ pub(crate) mod utils {
     }
 }
 
+#[cfg(wstd_p2)]
 use pin_project_lite::pin_project;
 use std::future::{Future, IntoFuture};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::{iter::AsyncIterator, runtime::AsyncPollable};
+use crate::iter::AsyncIterator;
+
+#[cfg(wstd_p2)]
+use crate::runtime::AsyncPollable;
 
 pub use crate::sys::time::SystemTime;
 
@@ -277,9 +281,13 @@ impl AsyncIterator for Interval {
     }
 }
 
+// ---- Timer (p2) ----
+
+#[cfg(wstd_p2)]
 #[derive(Debug)]
 pub struct Timer(Option<AsyncPollable>);
 
+#[cfg(wstd_p2)]
 impl Timer {
     pub fn never() -> Timer {
         Timer(None)
@@ -301,6 +309,7 @@ impl Timer {
     }
 }
 
+#[cfg(wstd_p2)]
 pin_project! {
     /// Future created by [`Timer::wait`]
     #[must_use = "futures do nothing unless polled or .awaited"]
@@ -310,6 +319,7 @@ pin_project! {
     }
 }
 
+#[cfg(wstd_p2)]
 impl Future for Wait {
     type Output = Instant;
 
@@ -321,6 +331,75 @@ impl Future for Wait {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(()) => Poll::Ready(Instant::now()),
             },
+        }
+    }
+}
+
+// ---- Timer (p3) ----
+
+#[cfg(wstd_p3)]
+pub struct Timer {
+    kind: TimerKind,
+}
+
+#[cfg(wstd_p3)]
+enum TimerKind {
+    Never,
+    After(Duration),
+    At(Instant),
+}
+
+#[cfg(wstd_p3)]
+impl std::fmt::Debug for Timer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Timer").finish()
+    }
+}
+
+#[cfg(wstd_p3)]
+impl Timer {
+    pub fn never() -> Timer {
+        Timer {
+            kind: TimerKind::Never,
+        }
+    }
+    pub fn at(deadline: Instant) -> Timer {
+        Timer {
+            kind: TimerKind::At(deadline),
+        }
+    }
+    pub fn after(duration: Duration) -> Timer {
+        Timer {
+            kind: TimerKind::After(duration),
+        }
+    }
+    pub fn set_after(&mut self, duration: Duration) {
+        *self = Self::after(duration);
+    }
+    pub fn wait(&self) -> Wait {
+        let inner: Pin<Box<dyn Future<Output = ()>>> = match self.kind {
+            TimerKind::Never => Box::pin(std::future::pending()),
+            TimerKind::After(d) => Box::pin(crate::sys::time::timer_wait_for(d.0)),
+            TimerKind::At(deadline) => Box::pin(crate::sys::time::timer_wait_until(deadline.0)),
+        };
+        Wait { inner }
+    }
+}
+
+#[cfg(wstd_p3)]
+#[must_use = "futures do nothing unless polled or .awaited"]
+pub struct Wait {
+    inner: Pin<Box<dyn Future<Output = ()>>>,
+}
+
+#[cfg(wstd_p3)]
+impl Future for Wait {
+    type Output = Instant;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.inner.as_mut().poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(()) => Poll::Ready(Instant::now()),
         }
     }
 }
