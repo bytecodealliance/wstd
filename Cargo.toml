@@ -13,13 +13,19 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["json"]
+default = ["json", "wasip2"]
 json = ["dep:serde", "dep:serde_json"]
+wasip2 = ["dep:wasip2"]
+wasip3 = ["dep:wasip3"]
+
+[build-dependencies]
+cfg_aliases = "0.2"
 
 [dependencies]
 anyhow.workspace = true
 async-task.workspace = true
 bytes.workspace = true
+cfg-if.workspace = true
 futures-lite.workspace = true
 http-body-util.workspace = true
 http-body.workspace = true
@@ -27,12 +33,18 @@ http.workspace = true
 itoa.workspace = true
 pin-project-lite.workspace = true
 slab.workspace = true
-wasip2.workspace = true
+wasip2 = { workspace = true, optional = true }
+wasip3 = { workspace = true, optional = true }
 wstd-macro.workspace = true
 
 # optional
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+
+# Auto-pull wasip3 deps when targeting wasm32-wasip3 so users don't need
+# to also pass --features wasip3.
+[target.'cfg(all(target_os = "wasi", target_env = "p3"))'.dependencies]
+wasip3 = { workspace = true }
 
 [dev-dependencies]
 anyhow.workspace = true
@@ -72,6 +84,7 @@ async-task = "4.7"
 axum = { version = "0.8.6", default-features = false }
 bytes = "1.10.1"
 cargo_metadata = "0.22"
+cfg-if = "1"
 clap = { version = "4.5.26", features = ["derive"] }
 futures-core = "0.3.19"
 futures-lite = "1.12.0"
@@ -95,7 +108,9 @@ test-programs = { path = "test-programs" }
 tower-service = "0.3.3"
 ureq = { version = "3.1", default-features = false, features = ["json"] }
 wasip2 = "1.0"
-wstd = { path = ".", version = "=0.6.6" }
+wasip3 = "0.5"
+wit-bindgen = { version = "0.54", default-features = false, features = ["async", "async-spawn", "inter-task-wakeup"] }
+wstd = { path = ".", version = "=0.6.6", default-features = false }
 wstd-axum = { path = "./axum", version = "=0.6.6" }
 wstd-axum-macro = { path = "./axum/macro", version = "=0.6.6" }
 wstd-macro = { path = "./macro", version = "=0.6.6" }

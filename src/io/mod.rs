@@ -5,18 +5,17 @@ mod cursor;
 mod empty;
 mod read;
 mod seek;
-mod stdio;
-mod streams;
 mod write;
 
+#[cfg(wstd_p2)]
 pub use crate::runtime::AsyncPollable;
+pub use crate::sys::io::*;
+pub use crate::sys::stdio::*;
 pub use copy::*;
 pub use cursor::*;
 pub use empty::*;
 pub use read::*;
 pub use seek::*;
-pub use stdio::*;
-pub use streams::*;
 pub use write::*;
 
 /// The error type for I/O operations.
