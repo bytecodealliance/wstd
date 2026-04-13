@@ -1,4 +1,14 @@
-use super::{REACTOR, Reactor};
+mod reactor;
+
+pub use ::async_task::Task;
+pub use reactor::{AsyncPollable, Reactor, WaitFor};
+use std::cell::RefCell;
+
+// There are no threads in WASI 0.2, so this is just a safe way to thread a single reactor to all
+// use sites in the background.
+std::thread_local! {
+pub(crate) static REACTOR: RefCell<Option<Reactor>> = const { RefCell::new(None) };
+}
 
 use std::future::Future;
 use std::pin::pin;
@@ -61,4 +71,15 @@ where
             )
         }
     }
+}
+
+/// Spawn a `Future` as a `Task` on the current `Reactor`.
+///
+/// Panics if called from outside `block_on`.
+pub fn spawn<F, T>(fut: F) -> Task<T>
+where
+    F: std::future::Future<Output = T> + 'static,
+    T: 'static,
+{
+    Reactor::current().spawn(fut)
 }

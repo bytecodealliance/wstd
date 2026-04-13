@@ -49,7 +49,9 @@ jobs:
         role-session-name: github-ci
 
     - name: check
-      run: cargo check --workspace --all --bins --examples
+      run: |
+        cargo check -p wstd -p wstd-axum --target wasm32-wasip2 --all-targets
+        cargo check -p test-programs
 
     - name: wstd tests
       run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 -- --nocapture
@@ -73,10 +75,12 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Docs
-      run: cargo doc
+      run: cargo doc --target wasm32-wasip2
 
     - name: Clippy
-      run: cargo clippy --all
+      run: |
+        cargo clippy -p wstd -p wstd-axum --target wasm32-wasip2 --all-targets
+        cargo clippy -p test-programs
 
   verify-publish:
     name: Verify publish

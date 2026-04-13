@@ -1,6 +1,7 @@
 pub use http::header::{HeaderMap, HeaderName, HeaderValue};
 
-use super::{Error, error::Context};
+use crate::http::Error;
+use crate::http::error::Context;
 use wasip2::http::types::Fields;
 
 pub(crate) fn header_map_from_wasi(wasi_fields: Fields) -> Result<HeaderMap, Error> {

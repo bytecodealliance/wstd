@@ -1,9 +1,9 @@
 use http::StatusCode;
 use wasip2::http::types::IncomingResponse;
 
+use super::fields::{HeaderMap, header_map_from_wasi};
 use crate::http::body::{Body, BodyHint};
 use crate::http::error::Error;
-use crate::http::fields::{HeaderMap, header_map_from_wasi};
 
 pub use http::response::{Builder, Response};
 
@@ -21,7 +21,6 @@ pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<B
         .expect("cannot call `consume` twice on incoming response");
     let body = Body::from_incoming(incoming_body, hint);
 
-    let mut builder = Response::builder().status(status);
     // The [`http::response::Builder`] keeps internal state of whether the
     // builder has errored, which is only reachable by passing
     // [`Builder::header`] an erroring `TryInto<HeaderName>` or
@@ -31,6 +30,7 @@ pub(crate) fn try_from_incoming(incoming: IncomingResponse) -> Result<Response<B
     // as control flow, we unwrap if this invariant is ever broken because
     // that would only be possible due to some unrecoverable bug in wstd,
     // rather than incorrect use or invalid input.
+    let mut builder = Response::builder().status(status);
     *builder.headers_mut().expect("builder has not errored") = headers;
     Ok(builder
         .body(body)

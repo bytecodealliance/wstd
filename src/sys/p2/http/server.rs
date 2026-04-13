@@ -18,7 +18,8 @@
 //! [`Response`]: crate::http::Response
 //! [`http_server`]: crate::http_server
 
-use super::{Body, Error, Response, error::ErrorCode, fields::header_map_to_wasi};
+use super::fields::header_map_to_wasi;
+use crate::http::{Body, Error, Response, error::ErrorCode};
 use http::header::CONTENT_LENGTH;
 use wasip2::exports::http::incoming_handler::ResponseOutparam;
 use wasip2::http::types::OutgoingResponse;
