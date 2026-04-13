@@ -367,31 +367,37 @@ mod test {
         assert_eq!(Duration::new(456, 864209753).as_nanos(), 456864209753);
 
         assert_eq!(Duration::from_secs(9876543210).as_secs(), 9876543210);
-        assert_eq!(Duration::from_secs(9876543210).as_millis(), 9876543210_000);
+        assert_eq!(
+            Duration::from_secs(9876543210).as_millis(),
+            9_876_543_210_000
+        );
         assert_eq!(
             Duration::from_secs(9876543210).as_micros(),
-            9876543210_000000
+            9_876_543_210_000_000
         );
         assert_eq!(
             Duration::from_secs(9876543210).as_nanos(),
-            9876543210_000000000
+            9_876_543_210_000_000_000
         );
 
         assert_eq!(Duration::from_millis(9876543210).as_secs(), 9876543);
         assert_eq!(Duration::from_millis(9876543210).as_millis(), 9876543210);
         assert_eq!(
             Duration::from_millis(9876543210).as_micros(),
-            9876543210_000
+            9_876_543_210_000
         );
         assert_eq!(
             Duration::from_millis(9876543210).as_nanos(),
-            9876543210_000000
+            9_876_543_210_000_000
         );
 
         assert_eq!(Duration::from_micros(9876543210).as_secs(), 9876);
         assert_eq!(Duration::from_micros(9876543210).as_millis(), 9876543);
         assert_eq!(Duration::from_micros(9876543210).as_micros(), 9876543210);
-        assert_eq!(Duration::from_micros(9876543210).as_nanos(), 9876543210_000);
+        assert_eq!(
+            Duration::from_micros(9876543210).as_nanos(),
+            9_876_543_210_000
+        );
 
         assert_eq!(Duration::from_nanos(9876543210).as_secs(), 9);
         assert_eq!(Duration::from_nanos(9876543210).as_millis(), 9876);
