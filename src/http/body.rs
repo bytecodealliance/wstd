@@ -173,7 +173,7 @@ impl Body {
 
     /// Get a value for the length of this `Body`'s content, in bytes, if
     /// known. This value can come from either the Content-Length header
-    /// recieved in the incoming request or response assocated with the body,
+    /// received in the incoming request or response assocated with the body,
     /// or be provided by an exact `http_body::Body::size_hint` if the `Body`
     /// is constructed from an `http_body::Body` impl.
     pub fn content_length(&self) -> Option<u64> {
