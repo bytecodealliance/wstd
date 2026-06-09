@@ -1,9 +1,16 @@
 //! Platform-specific backends.
 //!
 //! Each supported target provides an implementation under `src/sys/`, selected
-//! here by a single `cfg-if`. The rest of the crate is written against the
-//! backend-agnostic `crate::sys::*` re-exports below, mirroring the layout used
-//! by the `polling` crate.
+//! here by a single `cfg-if`. The crate-root modules (`crate::time`,
+//! `crate::io`, ...) are target-agnostic facades, free of `#[cfg]`, written
+//! against the `crate::sys::*` items the selected backend provides. There is no
+//! shared `trait`: backends are duck-typed in the `std::sys` style, and the
+//! `const _` assertions below check the shapes the facades depend on.
+//!
+//! Backend modules: `time`, `io`, `net`, `http`, `rand`, `runtime`. The reified
+//! pollable types (`AsyncPollable`, `WaitFor`) are p2-only and intentionally
+//! left out of the common contract; once a second backend lands they become a
+//! localized escape hatch rather than facade `#[cfg]`s.
 
 cfg_if::cfg_if! {
     if #[cfg(all(target_os = "wasi", target_env = "p2"))] {
@@ -15,3 +22,13 @@ cfg_if::cfg_if! {
 }
 
 pub use backend::*;
+
+// Check the selected backend provides the shapes the facades rely on, so drift
+// fails here instead of deep inside a facade.
+const _: fn() = || {
+    fn assert_async_read<T: crate::io::AsyncRead>() {}
+    fn assert_async_write<T: crate::io::AsyncWrite>() {}
+
+    assert_async_read::<crate::sys::io::AsyncInputStream>();
+    assert_async_write::<crate::sys::io::AsyncOutputStream>();
+};
