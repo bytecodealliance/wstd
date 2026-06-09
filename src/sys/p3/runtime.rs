@@ -34,6 +34,44 @@ where
     result
 }
 
+/// Helper used by the `#[wstd::main]` expansion to map an async `main`'s output
+/// into the `Result<(), ()>` that the `wasi:cli/run` export requires.
+///
+/// On `Err`, the error is reported to stderr before returning a failure so the
+/// component exits with a non-zero status.
+#[doc(hidden)]
+pub fn __finish_main<T: __MainReturn>(value: T) -> Result<(), ()> {
+    value.into_main_result()
+}
+
+/// Conversion from an async `main`'s return type to the `wasi:cli/run` result.
+///
+/// Implemented for `()` and `Result<(), E: Debug>`, matching the return types
+/// permitted on `async fn main`.
+#[doc(hidden)]
+pub trait __MainReturn {
+    /// Convert into the `Result<(), ()>` expected by `wasi:cli/run`.
+    fn into_main_result(self) -> Result<(), ()>;
+}
+
+impl __MainReturn for () {
+    fn into_main_result(self) -> Result<(), ()> {
+        Ok(())
+    }
+}
+
+impl<E: core::fmt::Debug> __MainReturn for Result<(), E> {
+    fn into_main_result(self) -> Result<(), ()> {
+        match self {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                eprintln!("Error: {err:?}");
+                Err(())
+            }
+        }
+    }
+}
+
 /// Spawn a `Future` as a `Task` on the current `Reactor`.
 ///
 /// Panics if called from outside `block_on`.

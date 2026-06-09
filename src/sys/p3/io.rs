@@ -81,9 +81,8 @@ impl AsyncRead for AsyncInputStream {
 /// around this by re-implementing the stream as an `async` state
 /// machine that owns the `AsyncInputStream` between yields.
 pub struct AsyncInputChunkStream {
-    inner: Pin<
-        Box<dyn futures_lite::stream::Stream<Item = Result<Vec<u8>, std::io::Error>> + Send>,
-    >,
+    inner:
+        Pin<Box<dyn futures_lite::stream::Stream<Item = Result<Vec<u8>, std::io::Error>> + Send>>,
     /// Holds the stream when the chunk-stream is created or after it
     /// reaches end-of-stream so that [`Self::into_inner`] can still
     /// return it. When `None`, the stream is in flight and cannot be
@@ -93,21 +92,18 @@ pub struct AsyncInputChunkStream {
 
 impl AsyncInputChunkStream {
     fn new(stream: AsyncInputStream, chunk_size: usize) -> Self {
-        let inner = futures_lite::stream::unfold(
-            Some((stream, chunk_size)),
-            |state| async move {
-                let (mut stream, n) = state?;
-                let mut buf = vec![0u8; n];
-                match stream.read(&mut buf).await {
-                    Ok(0) => None,
-                    Ok(k) => {
-                        buf.truncate(k);
-                        Some((Ok(buf), Some((stream, n))))
-                    }
-                    Err(e) => Some((Err(e), None)),
+        let inner = futures_lite::stream::unfold(Some((stream, chunk_size)), |state| async move {
+            let (mut stream, n) = state?;
+            let mut buf = vec![0u8; n];
+            match stream.read(&mut buf).await {
+                Ok(0) => None,
+                Ok(k) => {
+                    buf.truncate(k);
+                    Some((Ok(buf), Some((stream, n))))
                 }
-            },
-        );
+                Err(e) => Some((Err(e), None)),
+            }
+        });
         Self {
             inner: Box::pin(inner),
             saved: None,

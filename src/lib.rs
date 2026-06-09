@@ -89,6 +89,58 @@ pub mod __internal {
     pub use wasip2;
 }
 
+// Conditionally-compiled declarative macro for the `#[wstd::main]` entry point.
+//
+// The `#[wstd::main]` proc macro delegates to this declarative macro so the
+// `wstd_p2` / `wstd_p3` cfg aliases (defined in build.rs) are evaluated in
+// wstd's own context. Consumers don't need to define any features themselves.
+//
+// p2: the standard bin `fn main` is lifted to a synchronous `wasi:cli/run` by
+// the target's command adapter, and `block_on` drives the future to completion.
+//
+// p3: `block_on` cannot be used, because a synchronous `wasi:cli/run` task may
+// not block on async-lowered imports (it traps with "cannot block a synchronous
+// task before returning"). Instead we async-lift the export by implementing the
+// async `wasi:cli/run` guest directly, mirroring `__http_server_export!`.
+
+#[cfg(wstd_p2)]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __main_export {
+    (output { $($output:tt)* } run { $($run_fn:tt)* }) => {
+        pub fn main() $($output)* {
+            $($run_fn)*
+
+            $crate::runtime::block_on(async { __run().await })
+        }
+    };
+}
+
+#[cfg(wstd_p3)]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __main_export {
+    (output { $($output:tt)* } run { $($run_fn:tt)* }) => {
+        const _: () = {
+            $($run_fn)*
+
+            struct __WstdMain;
+
+            impl $crate::__internal::wasip3::exports::cli::run::Guest for __WstdMain {
+                async fn run() -> ::core::result::Result<(), ()> {
+                    $crate::runtime::__finish_main(__run().await)
+                }
+            }
+
+            $crate::__internal::wasip3::cli::command::export!(__WstdMain with_types_in $crate::__internal::wasip3);
+        };
+
+        // The bin target still requires a `fn main`; the real entry point is the
+        // async-lifted `wasi:cli/run` export above, so this is never invoked.
+        fn main() {}
+    };
+}
+
 pub mod prelude {
     pub use crate::future::FutureExt as _;
     pub use crate::io::AsyncRead as _;

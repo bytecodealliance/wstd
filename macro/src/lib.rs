@@ -30,16 +30,9 @@ pub fn attr_macro_main(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let output = input.sig.output;
     let block = input.block;
     quote! {
-        pub fn main() #output {
-
-            #(#attrs)*
-            async fn __run() #output {
-                #block
-            }
-
-            ::wstd::runtime::block_on(async {
-                __run().await
-            })
+        ::wstd::__main_export! {
+            output { #output }
+            run { #(#attrs)* async fn __run() #output #block }
         }
     }
     .into()
