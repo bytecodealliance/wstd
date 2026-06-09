@@ -365,6 +365,10 @@ fn verify(crates: &[Crate]) {
             .arg("--manifest-path")
             .arg(&krate.manifest)
             .env("CARGO_TARGET_DIR", "./target");
+        // wstd and wstd-axum only compile for wasm32-wasip2
+        if krate.name == "wstd" || krate.name == "wstd-axum" {
+            cmd.arg("--target").arg("wasm32-wasip2");
+        }
         let status = cmd.status().unwrap();
         assert!(status.success(), "failed to verify {:?}", &krate.manifest);
         let tar = Command::new("tar")
