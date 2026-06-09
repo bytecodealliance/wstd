@@ -28,7 +28,13 @@ pub use backend::*;
 const _: fn() = || {
     fn assert_async_read<T: crate::io::AsyncRead>() {}
     fn assert_async_write<T: crate::io::AsyncWrite>() {}
+    fn assert_sleep_future<T: core::future::Future<Output = ()>>() {}
 
     assert_async_read::<crate::sys::io::AsyncInputStream>();
     assert_async_write::<crate::sys::io::AsyncOutputStream>();
+    assert_sleep_future::<crate::sys::time::Sleep>();
+
+    let _: fn() -> crate::sys::time::MonotonicInstant = crate::sys::time::now;
+    let _: fn(crate::sys::time::MonotonicInstant) -> crate::sys::time::Sleep =
+        crate::sys::time::sleep_until;
 };
