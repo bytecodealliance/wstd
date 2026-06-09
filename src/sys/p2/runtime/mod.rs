@@ -8,7 +8,7 @@
 //! necessary wakers to work.
 
 #![deny(missing_debug_implementations, nonstandard_style)]
-#![warn(missing_docs, unreachable_pub)]
+#![warn(missing_docs)]
 
 mod block_on;
 mod reactor;

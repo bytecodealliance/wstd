@@ -55,6 +55,9 @@
 //! These are unique capabilities provided by WASI 0.2, and because this library
 //! is specific to that are exposed from here.
 
+#[allow(unreachable_pub)]
+mod sys;
+
 pub mod future;
 #[macro_use]
 pub mod http;

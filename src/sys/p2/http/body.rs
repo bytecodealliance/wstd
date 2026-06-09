@@ -1,8 +1,5 @@
-use crate::http::{
-    Error, HeaderMap,
-    error::Context as _,
-    fields::{header_map_from_wasi, header_map_to_wasi},
-};
+use super::fields::{header_map_from_wasi, header_map_to_wasi};
+use crate::http::{Error, HeaderMap, error::Context as _};
 use crate::io::{AsyncInputStream, AsyncOutputStream};
 use crate::runtime::{AsyncPollable, Reactor, WaitFor};
 
