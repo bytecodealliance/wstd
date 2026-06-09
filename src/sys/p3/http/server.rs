@@ -45,7 +45,7 @@ pub async fn response_to_wasi<B: Into<Body>>(
         None
     } else {
         let (writer, reader) = wasip3::wit_stream::new::<u8>();
-        wasip3::wit_bindgen::rt::async_support::spawn(async move {
+        wit_bindgen::rt::async_support::spawn(async move {
             let mut writer = writer;
             let remaining = writer.write_all(body_bytes).await;
             if !remaining.is_empty() {

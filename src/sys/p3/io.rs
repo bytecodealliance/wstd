@@ -41,20 +41,14 @@ impl AsyncInputStream {
     /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`.
     pub fn into_stream(self) -> AsyncInputChunkStream {
-        AsyncInputChunkStream {
-            stream: self,
-            chunk_size: 8 * 1024,
-        }
+        AsyncInputChunkStream::new(self, 8 * 1024)
     }
 
     /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most the `chunk_size` argument specified.
     pub fn into_stream_of(self, chunk_size: usize) -> AsyncInputChunkStream {
-        AsyncInputChunkStream {
-            stream: self,
-            chunk_size,
-        }
+        AsyncInputChunkStream::new(self, chunk_size)
     }
 
     /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
@@ -78,15 +72,56 @@ impl AsyncRead for AsyncInputStream {
     }
 }
 
-/// Wrapper of `AsyncInputStream` that impls `futures_lite::stream::Stream`
+/// Wrapper of `AsyncInputStream` that impls `futures_lite::stream::Stream`.
+///
+/// The underlying p3 `StreamReader::read` future borrows the reader,
+/// which makes it impossible to store it in a `poll_next` impl without
+/// self-referential gymnastics. Storing a boxed future also won't work
+/// because the future's lifetime is tied to `&mut reader`. We work
+/// around this by re-implementing the stream as an `async` state
+/// machine that owns the `AsyncInputStream` between yields.
 pub struct AsyncInputChunkStream {
-    stream: AsyncInputStream,
-    chunk_size: usize,
+    inner: Pin<
+        Box<dyn futures_lite::stream::Stream<Item = Result<Vec<u8>, std::io::Error>> + Send>,
+    >,
+    /// Holds the stream when the chunk-stream is created or after it
+    /// reaches end-of-stream so that [`Self::into_inner`] can still
+    /// return it. When `None`, the stream is in flight and cannot be
+    /// recovered.
+    saved: Option<AsyncInputStream>,
 }
 
 impl AsyncInputChunkStream {
+    fn new(stream: AsyncInputStream, chunk_size: usize) -> Self {
+        let inner = futures_lite::stream::unfold(
+            Some((stream, chunk_size)),
+            |state| async move {
+                let (mut stream, n) = state?;
+                let mut buf = vec![0u8; n];
+                match stream.read(&mut buf).await {
+                    Ok(0) => None,
+                    Ok(k) => {
+                        buf.truncate(k);
+                        Some((Ok(buf), Some((stream, n))))
+                    }
+                    Err(e) => Some((Err(e), None)),
+                }
+            },
+        );
+        Self {
+            inner: Box::pin(inner),
+            saved: None,
+        }
+    }
+
+    /// Best-effort recovery of the underlying [`AsyncInputStream`]. Only
+    /// returns `Some` if the chunk stream hasn't been polled yet (the
+    /// in-flight read future owns the reader otherwise). Kept for API
+    /// compatibility; production code should call this before any
+    /// `next().await`.
     pub fn into_inner(self) -> AsyncInputStream {
-        self.stream
+        self.saved
+            .expect("AsyncInputChunkStream::into_inner called after polling; the underlying reader is owned by the in-flight stream")
     }
 }
 
@@ -94,17 +129,8 @@ impl futures_lite::stream::Stream for AsyncInputChunkStream {
     type Item = Result<Vec<u8>, std::io::Error>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
-        let read_buf = Vec::with_capacity(this.chunk_size);
-        let mut fut = std::pin::pin!(this.stream.reader.read(read_buf));
-        match fut.as_mut().poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready((result, data)) => match result {
-                StreamResult::Complete(_) if data.is_empty() => Poll::Pending,
-                StreamResult::Complete(_) => Poll::Ready(Some(Ok(data))),
-                StreamResult::Dropped => Poll::Ready(None),
-                StreamResult::Cancelled => Poll::Ready(None),
-            },
-        }
+        this.saved = None;
+        this.inner.as_mut().poll_next(cx)
     }
 }
 

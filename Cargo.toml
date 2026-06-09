@@ -16,7 +16,7 @@ rust-version.workspace = true
 default = ["json", "wasip2"]
 json = ["dep:serde", "dep:serde_json"]
 wasip2 = ["dep:wasip2"]
-wasip3 = ["dep:wasip3"]
+wasip3 = ["dep:wasip3", "dep:wit-bindgen"]
 
 [build-dependencies]
 cfg_aliases = "0.2"
@@ -35,6 +35,7 @@ pin-project-lite.workspace = true
 slab.workspace = true
 wasip2 = { workspace = true, optional = true }
 wasip3 = { workspace = true, optional = true }
+wit-bindgen = { workspace = true, optional = true }
 wstd-macro.workspace = true
 
 # optional

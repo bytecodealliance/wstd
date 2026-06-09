@@ -25,20 +25,30 @@ impl Client {
     pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
         let parts = try_into_wasi_request(req, self.options.as_ref())?;
 
-        // Send body data through the stream writer
-        if let Some(mut body_writer) = parts.body_writer {
-            let mut body = parts.body;
-            let body_bytes = body.contents().await?;
-            if !body_bytes.is_empty() {
-                let remaining = body_writer.write_all(body_bytes.to_vec()).await;
-                if !remaining.is_empty() {
-                    return Err(anyhow::anyhow!("failed to write full request body"));
+        // Drive the request send and the body write concurrently. The
+        // `wasip3::http::client::send` future is what consumes the body
+        // stream's reader; if we wrote the body to completion *first*,
+        // `write_all` would block waiting for a consumer that hasn't been
+        // started yet (deadlock for any non-empty body).
+        let body_fut = async move {
+            if let Some(mut body_writer) = parts.body_writer {
+                let mut body = parts.body;
+                let body_bytes = body.contents().await?;
+                if !body_bytes.is_empty() {
+                    let remaining = body_writer.write_all(body_bytes.to_vec()).await;
+                    if !remaining.is_empty() {
+                        return Err(anyhow::anyhow!("failed to write full request body"));
+                    }
                 }
+                drop(body_writer);
             }
-            drop(body_writer);
-        }
+            Ok::<(), Error>(())
+        };
 
-        let wasi_resp = wasip3::http::client::send(parts.request).await?;
+        let send_fut = wasip3::http::client::send(parts.request);
+        let (send_res, body_res) = futures_lite::future::zip(send_fut, body_fut).await;
+        body_res?;
+        let wasi_resp = send_res?;
 
         // Create a completion future for consuming the response body
         let (_completion_writer, completion_reader) =
