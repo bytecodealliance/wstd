@@ -1,91 +1,49 @@
-use super::{Duration, Wait};
-use std::future::IntoFuture;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
-use wasip2::clocks::monotonic_clock;
+use wasip2::clocks::{
+    monotonic_clock::{self, subscribe_duration, subscribe_instant},
+    wall_clock,
+};
+
+use crate::runtime::{AsyncPollable, Reactor};
 
 /// A measurement of a monotonically nondecreasing clock. Opaque and useful only
 /// with Duration.
-///
-/// This type wraps `std::time::Duration` so we can implement traits on it
-/// without coherence issues, just like if we were implementing this in the
-/// stdlib.
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Copy)]
-pub struct Instant(pub(crate) monotonic_clock::Instant);
+pub type MonotonicInstant = monotonic_clock::Instant;
 
-impl Instant {
-    /// Returns an instant corresponding to "now".
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use wstd::time::Instant;
-    ///
-    /// let now = Instant::now();
-    /// ```
-    #[must_use]
+/// A duration from the monotonic clock, in nanoseconds.
+pub type MonotonicDuration = monotonic_clock::Duration;
+
+/// Return the current monotonic clock instant.
+pub fn now() -> MonotonicInstant {
+    monotonic_clock::now()
+}
+
+/// A measurement of the system clock, useful for talking to external entities
+/// like the file system or other processes. May be converted losslessly to a
+/// more useful `std::time::SystemTime` to provide more methods.
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub struct SystemTime(wall_clock::Datetime);
+
+impl SystemTime {
     pub fn now() -> Self {
-        Instant(wasip2::clocks::monotonic_clock::now())
-    }
-
-    /// Returns the amount of time elapsed from another instant to this one, or zero duration if
-    /// that instant is later than this one.
-    pub fn duration_since(&self, earlier: Instant) -> Duration {
-        Duration::from_nanos(self.0.saturating_sub(earlier.0))
-    }
-
-    /// Returns the amount of time elapsed since this instant.
-    pub fn elapsed(&self) -> Duration {
-        Instant::now().duration_since(*self)
+        Self(wall_clock::now())
     }
 }
 
-impl Add<Duration> for Instant {
-    type Output = Self;
-
-    fn add(self, rhs: Duration) -> Self::Output {
-        Self(self.0 + rhs.0)
+impl From<SystemTime> for std::time::SystemTime {
+    fn from(st: SystemTime) -> Self {
+        std::time::SystemTime::UNIX_EPOCH
+            + std::time::Duration::from_secs(st.0.seconds)
+            + std::time::Duration::from_nanos(st.0.nanoseconds.into())
     }
 }
 
-impl AddAssign<Duration> for Instant {
-    fn add_assign(&mut self, rhs: Duration) {
-        *self = Self(self.0 + rhs.0)
-    }
+/// Create a timer that fires at a specific monotonic clock instant.
+pub fn subscribe_at(instant: MonotonicInstant) -> AsyncPollable {
+    Reactor::current().schedule(subscribe_instant(instant))
 }
 
-impl Sub<Duration> for Instant {
-    type Output = Self;
-
-    fn sub(self, rhs: Duration) -> Self::Output {
-        Self(self.0 - rhs.0)
-    }
-}
-
-impl SubAssign<Duration> for Instant {
-    fn sub_assign(&mut self, rhs: Duration) {
-        *self = Self(self.0 - rhs.0)
-    }
-}
-
-impl IntoFuture for Instant {
-    type Output = Instant;
-
-    type IntoFuture = Wait;
-
-    fn into_future(self) -> Self::IntoFuture {
-        crate::task::sleep_until(self)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_duration_since() {
-        let x = Instant::now();
-        let d = Duration::new(456, 789);
-        let y = x + d;
-        assert_eq!(y.duration_since(x), d);
-    }
+/// Create a timer that fires after a monotonic clock duration.
+pub fn subscribe_after(duration: MonotonicDuration) -> AsyncPollable {
+    Reactor::current().schedule(subscribe_duration(duration))
 }
