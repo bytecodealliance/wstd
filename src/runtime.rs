@@ -7,4 +7,17 @@
 //! This will automatically wait for the futures to resolve, and call the
 //! necessary wakers to work.
 
-pub use crate::sys::runtime::*;
+pub use ::async_task::Task;
+
+pub use crate::sys::runtime::{AsyncPollable, Reactor, WaitFor, block_on};
+
+/// Spawn a `Future` as a `Task` on the current `Reactor`.
+///
+/// Panics if called from outside `block_on`.
+pub fn spawn<F, T>(fut: F) -> Task<T>
+where
+    F: std::future::Future<Output = T> + 'static,
+    T: 'static,
+{
+    Reactor::current().spawn(fut)
+}
