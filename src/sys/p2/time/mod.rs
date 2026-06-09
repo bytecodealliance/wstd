@@ -1,25 +1,30 @@
-//! Async time interfaces.
+//! Monotonic and system clocks for the wasip2 backend.
+//!
+//! This is the platform half of the [`crate::time`] facade. The facade owns the
+//! portable `Duration`/`Instant`/`Timer` types and all of their arithmetic;
+//! this module provides only the primitives that genuinely depend on the WASI
+//! 0.2 clocks. See [`crate::sys`] for the full backend contract.
 
-pub(crate) mod utils;
-
-mod duration;
-mod instant;
-pub use duration::Duration;
-pub use instant::Instant;
-
-use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use wasip2::clocks::{
-    monotonic_clock::{subscribe_duration, subscribe_instant},
-    wall_clock,
-};
+use wasip2::clocks::{monotonic_clock, wall_clock};
 
-use crate::{
-    iter::AsyncIterator,
-    runtime::{AsyncPollable, Reactor},
-};
+use crate::runtime::{Reactor, WaitFor};
+
+/// A measurement of the monotonic clock, in nanoseconds.
+///
+/// The facade's `Instant` wraps this. Keeping it a plain integer lets the
+/// facade own all time arithmetic without coupling to the backend.
+pub type MonotonicInstant = monotonic_clock::Instant;
+
+/// A span of monotonic-clock time, in nanoseconds.
+pub type MonotonicDuration = monotonic_clock::Duration;
+
+/// Return the current monotonic-clock instant.
+pub fn now() -> MonotonicInstant {
+    monotonic_clock::now()
+}
 
 /// A measurement of the system clock, useful for talking to external entities
 /// like the file system or other processes. May be converted losslessly to a
@@ -42,97 +47,32 @@ impl From<SystemTime> for std::time::SystemTime {
     }
 }
 
-/// An async iterator representing notifications at fixed interval.
-pub fn interval(duration: Duration) -> Interval {
-    Interval { duration }
-}
-
-/// An async iterator representing notifications at fixed interval.
+/// A future that resolves once the monotonic clock reaches a deadline.
 ///
-/// See the [`interval`] function for more.
+/// Created by [`sleep_until`]. This is the backend `Sleep` type named by the
+/// facade's `Timer`/`Wait`; on p2 it is a thin wrapper over a reactor-scheduled
+/// `monotonic-clock` pollable.
+#[must_use = "futures do nothing unless polled or .awaited"]
 #[derive(Debug)]
-pub struct Interval {
-    duration: Duration,
-}
-impl AsyncIterator for Interval {
-    type Item = Instant;
-
-    async fn next(&mut self) -> Option<Self::Item> {
-        Some(Timer::after(self.duration).wait().await)
-    }
+pub struct Sleep {
+    wait_for: WaitFor,
 }
 
-#[derive(Debug)]
-pub struct Timer(Option<AsyncPollable>);
+impl Future for Sleep {
+    type Output = ();
 
-impl Timer {
-    pub fn never() -> Timer {
-        Timer(None)
-    }
-    pub fn at(deadline: Instant) -> Timer {
-        let pollable = Reactor::current().schedule(subscribe_instant(deadline.0));
-        Timer(Some(pollable))
-    }
-    pub fn after(duration: Duration) -> Timer {
-        let pollable = Reactor::current().schedule(subscribe_duration(duration.0));
-        Timer(Some(pollable))
-    }
-    pub fn set_after(&mut self, duration: Duration) {
-        *self = Self::after(duration);
-    }
-    pub fn wait(&self) -> Wait {
-        let wait_for = self.0.as_ref().map(AsyncPollable::wait_for);
-        Wait { wait_for }
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.wait_for).poll(cx)
     }
 }
 
-pin_project! {
-    /// Future created by [`Timer::wait`]
-    #[must_use = "futures do nothing unless polled or .awaited"]
-    pub struct Wait {
-        #[pin]
-        wait_for: Option<crate::runtime::WaitFor>
-    }
-}
-
-impl Future for Wait {
-    type Output = Instant;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        match this.wait_for.as_pin_mut() {
-            None => Poll::Pending,
-            Some(f) => match f.poll(cx) {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(()) => Poll::Ready(Instant::now()),
-            },
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    async fn debug_duration(what: &str, f: impl Future<Output = Instant>) {
-        let start = Instant::now();
-        let now = f.await;
-        let d = now.duration_since(start);
-        let d: std::time::Duration = d.into();
-        println!("{what} awaited for {} s", d.as_secs_f32());
-    }
-
-    #[test]
-    fn timer_now() {
-        crate::runtime::block_on(debug_duration("timer_now", async {
-            Timer::at(Instant::now()).wait().await
-        }));
-    }
-
-    #[test]
-    fn timer_after_100_milliseconds() {
-        crate::runtime::block_on(debug_duration("timer_after_100_milliseconds", async {
-            Timer::after(Duration::from_millis(100)).wait().await
-        }));
+/// Create a [`Sleep`] future that resolves when the monotonic clock reaches
+/// `deadline`.
+///
+/// Must be called from within [`crate::runtime::block_on`].
+pub fn sleep_until(deadline: MonotonicInstant) -> Sleep {
+    let pollable = Reactor::current().schedule(monotonic_clock::subscribe_instant(deadline));
+    Sleep {
+        wait_for: pollable.wait_for(),
     }
 }
