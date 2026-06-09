@@ -1,24 +1,7 @@
-//! HTTP servers
-//!
-//! The WASI HTTP server uses the [typed main] idiom, with a `main` function
-//! that takes a [`Request`] and succeeds with a [`Response`], using the
-//! [`http_server`] macro:
-//!
-//! ```no_run
-//! use wstd::http::{Request, Response, Body, Error};
-//! #[wstd::http_server]
-//! async fn main(_request: Request<Body>) -> Result<Response<Body>, Error> {
-//!     Ok(Response::new("Hello!\n".into()))
-//! }
-//! ```
-//!
-//! [typed main]: https://sunfishcode.github.io/typed-main-wasi-presentation/chapter_1.html
-//! [`Request`]: crate::http::Request
-//! [`Responder`]: crate::http::server::Responder
-//! [`Response`]: crate::http::Response
-//! [`http_server`]: crate::http_server
+//! HTTP servers (wasip2 backend).
 
-use super::{Body, Error, Response, error::ErrorCode, fields::header_map_to_wasi};
+use super::fields::header_map_to_wasi;
+use crate::http::{Body, Error, Response, error::ErrorCode};
 use http::header::CONTENT_LENGTH;
 use wasip2::exports::http::incoming_handler::ResponseOutparam;
 use wasip2::http::types::OutgoingResponse;
