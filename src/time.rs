@@ -377,7 +377,7 @@ impl Timer {
         *self = Self::after(duration);
     }
     pub fn wait(&self) -> Wait {
-        let inner: Pin<Box<dyn Future<Output = ()>>> = match self.kind {
+        let inner: Pin<Box<dyn Future<Output = ()> + Send>> = match self.kind {
             TimerKind::Never => Box::pin(std::future::pending()),
             TimerKind::After(d) => Box::pin(crate::sys::time::timer_wait_for(d.0)),
             TimerKind::At(deadline) => Box::pin(crate::sys::time::timer_wait_until(deadline.0)),
@@ -389,7 +389,7 @@ impl Timer {
 #[cfg(wstd_p3)]
 #[must_use = "futures do nothing unless polled or .awaited"]
 pub struct Wait {
-    inner: Pin<Box<dyn Future<Output = ()>>>,
+    inner: Pin<Box<dyn Future<Output = ()> + Send>>,
 }
 
 #[cfg(wstd_p3)]

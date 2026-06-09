@@ -11,7 +11,8 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["wasip2"]
+default = ["json", "wasip2"]
+json = ["wstd/json"]
 wasip2 = ["wstd/wasip2"]
 wasip3 = ["wstd/wasip3"]
 

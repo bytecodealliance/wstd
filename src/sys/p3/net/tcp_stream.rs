@@ -1,14 +1,22 @@
+use std::cell::RefCell;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, ToSocketAddrs};
 
+use super::tcp_listener::sockaddr_from_wasi;
 use super::to_io_err;
 use crate::io::{self, AsyncInputStream, AsyncOutputStream};
 use wasip3::sockets::types::{IpAddressFamily, IpSocketAddress, Ipv4SocketAddress, TcpSocket};
 
 /// A TCP stream between a local and a remote socket.
+///
+/// The underlying p3 stream reader and writer require `&mut` access, so they
+/// are wrapped in `RefCell`s. This lets `TcpStream` mirror the p2 API surface,
+/// where reading and writing are available through shared `&TcpStream`
+/// references (e.g. `io::copy(&stream, &stream)`).
 pub struct TcpStream {
-    input: AsyncInputStream,
-    output: AsyncOutputStream,
+    input: RefCell<AsyncInputStream>,
+    output: RefCell<AsyncOutputStream>,
+    socket: TcpSocket,
 }
 
 impl std::fmt::Debug for TcpStream {
@@ -18,8 +26,16 @@ impl std::fmt::Debug for TcpStream {
 }
 
 impl TcpStream {
-    pub(crate) fn new(input: AsyncInputStream, output: AsyncOutputStream) -> Self {
-        TcpStream { input, output }
+    pub(crate) fn new(
+        input: AsyncInputStream,
+        output: AsyncOutputStream,
+        socket: TcpSocket,
+    ) -> Self {
+        TcpStream {
+            input: RefCell::new(input),
+            output: RefCell::new(output),
+            socket,
+        }
     }
 
     /// Opens a TCP connection to a remote host.
@@ -73,65 +89,78 @@ impl TcpStream {
         let _send_completion = socket.send(send_reader);
         let output = AsyncOutputStream::new(send_writer);
 
-        Ok(TcpStream::new(input, output))
+        Ok(TcpStream::new(input, output, socket))
     }
 
-    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
-        let ptr = self as *mut TcpStream;
-        // Safety: ReadHalf only accesses input, WriteHalf only accesses output
-        #[allow(unsafe_code)]
-        unsafe {
-            (ReadHalf(&mut *ptr), WriteHalf(&mut *ptr))
-        }
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.socket
+            .get_remote_address()
+            .map_err(to_io_err)
+            .map(sockaddr_from_wasi)
+    }
+
+    pub fn split(&self) -> (ReadHalf<'_>, WriteHalf<'_>) {
+        (ReadHalf(self), WriteHalf(self))
     }
 }
 
 impl io::AsyncRead for TcpStream {
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.input.read(buf).await
+        self.input.get_mut().read(buf).await
     }
+}
 
-    fn as_async_input_stream(&self) -> Option<&AsyncInputStream> {
-        Some(&self.input)
+// The `RefCell` borrows below are held across `.await`. This is sound for the
+// supported usage (a single reader and a single writer operating on disjoint
+// cells, e.g. `io::copy(&stream, &stream)`): the input and output cells are
+// never borrowed concurrently. Concurrently issuing two reads (or two writes)
+// on the same stream would panic, which mirrors the exclusive-access nature of
+// the underlying p3 stream resources.
+#[allow(clippy::await_holding_refcell_ref)]
+impl io::AsyncRead for &TcpStream {
+    async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.input.borrow_mut().read(buf).await
     }
 }
 
 impl io::AsyncWrite for TcpStream {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.output.write(buf).await
+        self.output.get_mut().write(buf).await
     }
 
     async fn flush(&mut self) -> io::Result<()> {
-        self.output.flush().await
-    }
-
-    fn as_async_output_stream(&self) -> Option<&AsyncOutputStream> {
-        Some(&self.output)
+        self.output.get_mut().flush().await
     }
 }
 
-pub struct ReadHalf<'a>(&'a mut TcpStream);
+#[allow(clippy::await_holding_refcell_ref)]
+impl io::AsyncWrite for &TcpStream {
+    async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.output.borrow_mut().write(buf).await
+    }
+
+    async fn flush(&mut self) -> io::Result<()> {
+        self.output.borrow_mut().flush().await
+    }
+}
+
+pub struct ReadHalf<'a>(&'a TcpStream);
+#[allow(clippy::await_holding_refcell_ref)]
 impl<'a> io::AsyncRead for ReadHalf<'a> {
     async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.input.read(buf).await
-    }
-
-    fn as_async_input_stream(&self) -> Option<&AsyncInputStream> {
-        Some(&self.0.input)
+        self.0.input.borrow_mut().read(buf).await
     }
 }
 
-pub struct WriteHalf<'a>(&'a mut TcpStream);
+pub struct WriteHalf<'a>(&'a TcpStream);
+#[allow(clippy::await_holding_refcell_ref)]
 impl<'a> io::AsyncWrite for WriteHalf<'a> {
     async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.output.write(buf).await
+        self.0.output.borrow_mut().write(buf).await
     }
 
     async fn flush(&mut self) -> io::Result<()> {
-        self.0.output.flush().await
-    }
-
-    fn as_async_output_stream(&self) -> Option<&AsyncOutputStream> {
-        Some(&self.0.output)
+        self.0.output.borrow_mut().flush().await
     }
 }

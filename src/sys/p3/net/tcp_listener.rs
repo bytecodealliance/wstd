@@ -1,5 +1,6 @@
 use crate::io;
 use crate::iter::AsyncIterator;
+use std::cell::RefCell;
 use std::net::SocketAddr;
 
 use super::{TcpStream, to_io_err};
@@ -7,8 +8,12 @@ use wasip3::sockets::types::{IpAddressFamily, IpSocketAddress, Ipv4SocketAddress
 use wasip3::wit_bindgen::rt::async_support::StreamReader;
 
 /// A TCP socket server, listening for connections.
+///
+/// The p3 accept stream requires `&mut` access to make progress, so it is
+/// wrapped in a `RefCell`. This lets `TcpListener` mirror the p2 API surface,
+/// where `incoming` is available through a shared `&TcpListener` reference.
 pub struct TcpListener {
-    accept_stream: StreamReader<TcpSocket>,
+    accept_stream: RefCell<StreamReader<TcpSocket>>,
     socket: TcpSocket,
 }
 
@@ -35,7 +40,7 @@ impl TcpListener {
         socket.bind(local_address).map_err(to_io_err)?;
         let accept_stream = socket.listen().map_err(to_io_err)?;
         Ok(Self {
-            accept_stream,
+            accept_stream: RefCell::new(accept_stream),
             socket,
         })
     }
@@ -49,14 +54,14 @@ impl TcpListener {
     }
 
     /// Returns an iterator over the connections being received on this listener.
-    pub fn incoming(&mut self) -> Incoming<'_> {
+    pub fn incoming(&self) -> Incoming<'_> {
         Incoming { listener: self }
     }
 }
 
 /// An iterator that infinitely accepts connections on a TcpListener.
 pub struct Incoming<'a> {
-    listener: &'a mut TcpListener,
+    listener: &'a TcpListener,
 }
 
 impl<'a> std::fmt::Debug for Incoming<'a> {
@@ -65,19 +70,23 @@ impl<'a> std::fmt::Debug for Incoming<'a> {
     }
 }
 
+// The accept stream is consumed by a single `incoming` iterator at a time, so
+// holding the `RefCell` borrow across `.await` here is sound.
+#[allow(clippy::await_holding_refcell_ref)]
 impl<'a> AsyncIterator for Incoming<'a> {
     type Item = io::Result<TcpStream>;
 
     async fn next(&mut self) -> Option<Self::Item> {
         self.listener
             .accept_stream
+            .borrow_mut()
             .next()
             .await
             .map(TcpStream::from_connected_socket)
     }
 }
 
-fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
+pub(crate) fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
     use wasip3::sockets::types::Ipv6SocketAddress;
     match addr {
         IpSocketAddress::Ipv4(Ipv4SocketAddress { address, port }) => {
