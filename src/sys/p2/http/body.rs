@@ -1,14 +1,11 @@
-use crate::http::{
-    Error, HeaderMap,
-    error::Context as _,
-    fields::{header_map_from_wasi, header_map_to_wasi},
-};
+use super::fields::{header_map_from_wasi, header_map_to_wasi};
 use crate::io::{AsyncInputStream, AsyncOutputStream};
 use crate::runtime::{AsyncPollable, Reactor, WaitFor};
 
 pub use ::http_body::{Body as HttpBody, Frame, SizeHint};
 pub use bytes::Bytes;
 
+use anyhow::Context as _;
 use http::header::CONTENT_LENGTH;
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use std::fmt;
@@ -19,6 +16,9 @@ use wasip2::http::types::{
     FutureTrailers, IncomingBody as WasiIncomingBody, OutgoingBody as WasiOutgoingBody,
 };
 use wasip2::io::streams::{InputStream as WasiInputStream, StreamError};
+
+type Error = anyhow::Error;
+type HeaderMap = http::header::HeaderMap;
 
 pub mod util {
     pub use http_body_util::*;
