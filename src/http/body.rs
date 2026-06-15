@@ -47,6 +47,9 @@ pub mod util {
 /// * `async fn Body::contents(&mut self) -> Result<&[u8], Error>` is ready
 ///   when all contents of the body have been collected, and gives them as a
 ///   byte slice.
+/// * `async fn Body::bytes_contents(&mut self) -> Result<Bytes, Error>` is
+///   the same as `Body::contents`, except returns the `Bytes` type instead of
+///   a byte slice.
 /// * `async fn Body::str_contents(&mut self) -> Result<&str, Error>` is ready
 ///   when all contents of the body have been collected, and gives them as a str
 ///   slice.
@@ -168,6 +171,16 @@ impl Body {
                     _ => unreachable!(),
                 })
             }
+        }
+    }
+    /// Collect the entire contents of this `Body`, and expose it as `Bytes`.
+    /// This async fn will be pending until the entire `Body` is
+    /// copied into memory, or an error occurs.
+    pub async fn bytes_contents(&mut self) -> Result<Bytes, Error> {
+        let _ = self.contents().await?;
+        match &self.0 {
+            BodyInner::Complete { data, .. } => Ok(data.clone()),
+            _ => unreachable!(),
         }
     }
 
