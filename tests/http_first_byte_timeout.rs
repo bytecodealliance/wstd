@@ -2,7 +2,7 @@
 
 use wstd::http::{Body, Client, Request, error::ErrorCode};
 
-#[wstd::main]
+#[wstd::test]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set first byte timeout to 1/2 second.
     let mut client = Client::new();
