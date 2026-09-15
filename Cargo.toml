@@ -37,7 +37,7 @@ serde_json = { workspace = true, optional = true }
 wasip2.workspace = true
 
 [target.'cfg(all(target_os = "wasi", target_env = "p3"))'.dependencies]
-wasip3.workspace = true
+wasip3 = { workspace = true, features = ["async-spawn"] }
 
 [dev-dependencies]
 anyhow.workspace = true
