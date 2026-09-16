@@ -51,8 +51,12 @@ jobs:
     - name: rust version
       run: cargo --version
 
-    - name: check
-      run: cargo check --workspace --all --bins --examples
+    - name: check p2
+      run: cargo check --workspace --all --bins --examples --target wasm32-wasip2
+
+    - name: check p3
+      if: matrix.rust == 'nightly'
+      run: cargo check --workspace --all --bins --examples --target wasm32-wasip3
 
     - name: wstd p2 tests
       run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 -- --nocapture
