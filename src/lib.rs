@@ -60,7 +60,6 @@ pub mod future;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
 #[macro_use]
 pub mod http;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod io;
 pub mod iter;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
