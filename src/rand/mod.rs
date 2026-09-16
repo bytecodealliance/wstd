@@ -1,6 +1,9 @@
 //! Random number generation.
 
+#[cfg(target_env = "p2")]
 use wasip2::random;
+#[cfg(target_env = "p3")]
+use wasip3::random;
 
 /// Fill the slice with cryptographically secure random bytes.
 pub fn get_random_bytes(buf: &mut [u8]) {
