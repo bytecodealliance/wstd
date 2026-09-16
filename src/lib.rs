@@ -68,7 +68,9 @@ pub mod net;
 #[cfg(target_os = "wasi")]
 pub mod rand;
 pub mod runtime;
+#[cfg(target_os = "wasi")]
 pub mod task;
+#[cfg(target_os = "wasi")]
 pub mod time;
 
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
