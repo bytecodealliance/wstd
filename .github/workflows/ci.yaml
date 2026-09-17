@@ -54,6 +54,8 @@ jobs:
     - name: check p2
       run: cargo check --workspace --all --bins --examples --target wasm32-wasip2
 
+    # TODO: remove all nightly conditions for p3 targets once wasm32-wasip3 is
+    # stable.
     - name: check p3
       if: matrix.rust == 'nightly'
       run: cargo check --workspace --all --bins --examples --target wasm32-wasip3
