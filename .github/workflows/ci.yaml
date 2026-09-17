@@ -83,11 +83,21 @@ jobs:
     - name: fmt
       run: cargo fmt --all -- --check
 
-    - name: Docs
-      run: cargo doc
+    - name: Docs p2
+      run: cargo doc --target wasm32-wasip2
 
-    - name: Clippy
-      run: cargo clippy --all
+    - name: Docs p3
+      if: matrix.rust == 'nightly'
+      run: cargo doc --target wasm32-wasip3
+
+    - name: Clippy p2
+      run: |
+        cargo clippy --workspace --exclude test-programs --target wasm32-wasip2
+        cargo clippy -p test-programs
+
+    - name: Clippy p3
+      if: matrix.rust == 'nightly'
+      run: cargo clippy --workspace --exclude test-programs --target wasm32-wasip3
 
   verify-publish:
     name: Verify publish
