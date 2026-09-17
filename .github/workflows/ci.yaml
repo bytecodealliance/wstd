@@ -51,8 +51,14 @@ jobs:
     - name: rust version
       run: cargo --version
 
-    - name: check
-      run: cargo check --workspace --all --bins --examples
+    - name: check p2
+      run: cargo check --workspace --all --bins --examples --target wasm32-wasip2
+
+    # TODO: remove all nightly conditions for p3 targets once wasm32-wasip3 is
+    # stable.
+    - name: check p3
+      if: matrix.rust == 'nightly'
+      run: cargo check --workspace --all --bins --examples --target wasm32-wasip3
 
     - name: wstd p2 tests
       run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 -- --nocapture
@@ -75,15 +81,22 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - uses: ./.github/actions/install-rust
+      with:
+        toolchain: nightly
 
     - name: fmt
       run: cargo fmt --all -- --check
 
     - name: Docs
-      run: cargo doc
+      run: |
+        cargo doc --target wasm32-wasip2
+        cargo doc --target wasm32-wasip3
 
     - name: Clippy
-      run: cargo clippy --all
+      run: |
+        cargo clippy --workspace --exclude test-programs --target wasm32-wasip2
+        cargo clippy --workspace --exclude test-programs --target wasm32-wasip3
+        cargo clippy -p test-programs
 
   verify-publish:
     name: Verify publish
@@ -92,6 +105,8 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - uses: ./.github/actions/install-rust
+      with:
+        toolchain: nightly
     - run: rustc ci/publish.rs
     # Make sure we can bump version numbers for the next release
     - run: ./publish bump
