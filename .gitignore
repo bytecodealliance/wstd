@@ -1,5 +1,6 @@
 target/
 tmp/
+.vscode/
 Cargo.lock
 .DS_Store
 publish

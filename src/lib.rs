@@ -65,20 +65,8 @@ pub mod io;
 pub mod iter;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod net;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod rand;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod runtime;
-#[cfg(all(target_os = "wasi", target_env = "p3"))]
-pub mod runtime {
-    pub fn block_on<F, T>(fut: F) -> F::Output
-    where
-        F: Future<Output = T>,
-        T: 'static,
-    {
-        wasip3::wit_bindgen::block_on(fut)
-    }
-}
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod task;
 #[cfg(all(target_os = "wasi", target_env = "p2"))]
