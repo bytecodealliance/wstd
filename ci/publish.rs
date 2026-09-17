@@ -322,6 +322,10 @@ fn publish(krate: &Crate) -> bool {
         .arg("publish")
         .current_dir(krate.manifest.parent().unwrap())
         .arg("--no-verify")
+        .arg("--target")
+        .arg("wasm32-wasip2")
+        .arg("--target")
+        .arg("wasm32-wasip3")
         .status()
         .expect("failed to run cargo");
     if !status.success() {
@@ -362,6 +366,10 @@ fn verify(crates: &[Crate]) {
         let mut cmd = Command::new("cargo");
         cmd.arg("package")
             .arg("--allow-dirty")
+            .arg("--target")
+            .arg("wasm32-wasip2")
+            .arg("--target")
+            .arg("wasm32-wasip3")
             .arg("--manifest-path")
             .arg(&krate.manifest)
             .env("CARGO_TARGET_DIR", "./target");
