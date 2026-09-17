@@ -37,6 +37,7 @@ runs:
 
         if [ "${{ inputs.toolchain }}" = "nightly" ]; then
           rustup target add wasm32-wasip3
+          rustup component add rustfmt
         fi
 
         # Save disk space by avoiding incremental compilation. Also turn down
