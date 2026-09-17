@@ -1,7 +1,10 @@
 use super::{Instant, Wait};
 use std::future::IntoFuture;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
+#[cfg(target_env = "p2")]
 use wasip2::clocks::monotonic_clock;
+#[cfg(target_env = "p3")]
+use wasip3::clocks::monotonic_clock;
 
 /// A Duration type to represent a span of time, typically used for system
 /// timeouts.
