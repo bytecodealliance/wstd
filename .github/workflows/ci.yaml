@@ -106,6 +106,8 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - uses: ./.github/actions/install-rust
+      with:
+        toolchain: nightly
     - run: rustc ci/publish.rs
     # Make sure we can bump version numbers for the next release
     - run: ./publish bump
