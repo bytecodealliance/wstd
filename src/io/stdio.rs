@@ -90,7 +90,7 @@ impl AsyncRead for Stdin {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let read = self.stream.read(buf).await?;
         #[cfg(target_env = "p3")]
-        if read == 0 && buf.len() > 0 {
+        if read == 0 && buf.is_empty() {
             self.check_error().await?;
         }
         Ok(read)
