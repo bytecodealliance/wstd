@@ -1,4 +1,4 @@
-pub use http::header::{HeaderMap, HeaderName, HeaderValue};
+pub(super) use http::header::{HeaderMap, HeaderName, HeaderValue};
 
 use super::{Error, error::Context};
 use wasip2::http::types::Fields;

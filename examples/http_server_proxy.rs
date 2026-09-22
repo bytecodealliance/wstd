@@ -1,6 +1,3 @@
-#![cfg_attr(not(all(target_os = "wasi", target_env = "p2")), no_main)]
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
-
 //! Run the example with:
 //! ```sh
 //! cargo build --example http_server_proxy --target=wasm32-wasip2

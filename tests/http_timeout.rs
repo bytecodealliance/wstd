@@ -1,5 +1,3 @@
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
-
 use wstd::future::FutureExt;
 use wstd::http::{Body, Client, Request};
 use wstd::time::Duration;

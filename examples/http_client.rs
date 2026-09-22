@@ -1,6 +1,3 @@
-#![cfg_attr(not(all(target_os = "wasi", target_env = "p2")), no_main)]
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
-
 use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
 use wstd::http::{Body, BodyExt, Client, Method, Request, Uri};

@@ -14,11 +14,11 @@
 //!
 //! [typed main]: https://sunfishcode.github.io/typed-main-wasi-presentation/chapter_1.html
 //! [`Request`]: crate::http::Request
-//! [`Responder`]: crate::http::server::Responder
 //! [`Response`]: crate::http::Response
 //! [`http_server`]: crate::http_server
 
-use super::{Body, Error, Response, error::ErrorCode, fields::header_map_to_wasi};
+use super::fields::header_map_to_wasi;
+use super::{Body, Error, Response, error::ErrorCode};
 use wasip2::exports::http::incoming_handler::ResponseOutparam;
 use wasip2::http::types::OutgoingResponse;
 

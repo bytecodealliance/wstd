@@ -3,16 +3,27 @@ use std::time::{Duration, Instant};
 
 #[test_log::test]
 fn http_server() -> Result<()> {
+    run(test_programs::HTTP_SERVER)
+}
+
+#[cfg(wstd_nightly)]
+#[test_log::test]
+fn http_server_p3() -> Result<()> {
+    run(test_programs::HTTP_SERVER_P3)
+}
+
+fn run(component: &str) -> Result<()> {
     // Run wasmtime serve.
     // Enable -Scli because we currently don't have a way to build with the
     // proxy adapter, so we build with the default adapter.
-    let _serve = test_programs::WasmtimeServe::new(test_programs::HTTP_SERVER)?;
+    let serve = test_programs::WasmtimeServe::new(component)?;
+    let addr = serve.get_listening_address();
 
     // Test each path in the server:
 
     // TEST / http_home
     // Response body is the hard-coded default
-    let body: String = ureq::get("http://127.0.0.1:8081")
+    let body: String = ureq::get(format!("http://{addr}"))
         .call()?
         .body_mut()
         .read_to_string()?;
@@ -22,7 +33,7 @@ fn http_server() -> Result<()> {
     // Sleeps for 1 second, then sends a response with body containing
     // internally measured sleep time.
     let start = Instant::now();
-    let body: String = ureq::get("http://127.0.0.1:8081/wait-response")
+    let body: String = ureq::get(format!("http://{addr}/wait-response"))
         .call()?
         .body_mut()
         .read_to_string()?;
@@ -44,7 +55,7 @@ fn http_server() -> Result<()> {
     // with a delay in the body. Additionally, the implementation MAY buffer up the
     // entire response and body before sending it, though wasmtime does not.
     let start = Instant::now();
-    let body: String = ureq::get("http://127.0.0.1:8081/wait-body")
+    let body: String = ureq::get(format!("http://{addr}/wait-body"))
         .call()?
         .body_mut()
         .read_to_string()?;
@@ -67,7 +78,7 @@ fn http_server() -> Result<()> {
     // with a delay in the body. Additionally, the implementation MAY buffer up the
     // entire response and body before sending it, though wasmtime does not.
     let start = Instant::now();
-    let body: String = ureq::get("http://127.0.0.1:8081/stream-body")
+    let body: String = ureq::get(format!("http://{addr}/stream-body"))
         .call()?
         .body_mut()
         .read_to_string()?;
@@ -88,7 +99,7 @@ fn http_server() -> Result<()> {
     // TEST /echo htto_echo
     // Send a request body, see that we got the same back in response body.
     const MESSAGE: &[u8] = b"hello, echoserver!\n";
-    let body: String = ureq::get("http://127.0.0.1:8081/echo")
+    let body: String = ureq::get(format!("http://{addr}/echo"))
         .force_send_body()
         .send(MESSAGE)?
         .body_mut()
@@ -106,7 +117,7 @@ fn http_server() -> Result<()> {
         ("Blue", "Blueberries"),
         ("Purple", "Beets"),
     ];
-    let mut request = ureq::get("http://127.0.0.1:8081/echo-headers");
+    let mut request = ureq::get(format!("http://{addr}/echo-headers"));
     for (name, value) in test_headers {
         request = request.header(name, value);
     }
@@ -125,7 +136,7 @@ fn http_server() -> Result<()> {
     // TEST /response-code http_response_code
     // Send request with `X-Request-Code: <status>`. Should get back that
     // status.
-    let response = ureq::get("http://127.0.0.1:8081/response-status")
+    let response = ureq::get(format!("http://{addr}/response-status"))
         .header("X-Response-Status", "401")
         .call();
     // ureq gives us a 401 in an Error::StatusCode
@@ -139,7 +150,7 @@ fn http_server() -> Result<()> {
     // TEST /response-fail http_response_fail
     // Wasmtime gives a 500 error when wasi-http guest gives error instead of
     // response
-    match ureq::get("http://127.0.0.1:8081/response-fail").call() {
+    match ureq::get(format!("http://{addr}/response-fail")).call() {
         Err(ureq::Error::StatusCode(500)) => {}
         result => {
             panic!("/response-fail expected status 500 error, got: {result:?}");
@@ -149,7 +160,7 @@ fn http_server() -> Result<()> {
     // TEST /response-body-fail http_body_fail
     // Response status and headers sent off, then error in body will close
     // connection
-    match ureq::get("http://127.0.0.1:8081/response-body-fail").call() {
+    match ureq::get(format!("http://{addr}/response-body-fail")).call() {
         Err(ureq::Error::Io(_transport)) => {}
         Ok(mut response) => match response.body_mut().read_to_vec() {
             Err(ureq::Error::Io(_transport)) => {}

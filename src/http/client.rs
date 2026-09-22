@@ -1,9 +1,13 @@
 use super::{Body, Error, Request, Response};
 use crate::http::request::try_into_outgoing;
 use crate::http::response::try_from_incoming;
+#[cfg(target_env = "p2")]
 use crate::io::AsyncPollable;
 use crate::time::Duration;
+#[cfg(target_env = "p2")]
 use wasip2::http::types::RequestOptions as WasiRequestOptions;
+#[cfg(target_env = "p3")]
+use wasip3::http::types::RequestOptions as WasiRequestOptions;
 
 /// An HTTP client.
 #[derive(Debug, Clone)]
@@ -25,31 +29,46 @@ impl Client {
 
     /// Send an HTTP request.
     pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>, Error> {
-        let (wasi_req, body) = try_into_outgoing(req)?;
-        let body = body.into();
-        let wasi_body = wasi_req.body().unwrap();
+        #[cfg(target_env = "p3")]
+        {
+            let mut request = req.map(Into::into);
+            if let Some(options) = self.wasi_options()? {
+                request
+                    .extensions_mut()
+                    .insert(wasip3::http_compat::RequestOptionsExtension(options));
+            }
+            let request = try_into_outgoing(request)?;
+            try_from_incoming(wasip3::http::client::send(request).await?)
+        }
 
-        // 1. Start sending the request head
-        let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?)?;
+        #[cfg(target_env = "p2")]
+        {
+            let (wasi_req, body) = try_into_outgoing(req)?;
+            let body = body.into();
+            let wasi_body = wasi_req.body().unwrap();
 
-        let ((), body) = futures_lite::future::try_zip(
-            async move {
-                // 3. send the body:
-                body.send(wasi_body).await
-            },
-            async move {
-                // 4. Receive the response
-                AsyncPollable::new(res.subscribe()).wait_for().await;
+            // 1. Start sending the request head
+            let res = wasip2::http::outgoing_handler::handle(wasi_req, self.wasi_options()?)?;
 
-                // NOTE: the first `unwrap` is to ensure readiness, the second `unwrap`
-                // is to trap if we try and get the response more than once. The final
-                // `?` is to raise the actual error if there is one.
-                let res = res.get().unwrap().unwrap()?;
-                try_from_incoming(res)
-            },
-        )
-        .await?;
-        Ok(body)
+            let ((), body) = futures_lite::future::try_zip(
+                async move {
+                    // 3. send the body:
+                    body.send(wasi_body).await
+                },
+                async move {
+                    // 4. Receive the response
+                    AsyncPollable::new(res.subscribe()).wait_for().await;
+
+                    // NOTE: the first `unwrap` is to ensure readiness, the second `unwrap`
+                    // is to trap if we try and get the response more than once. The final
+                    // `?` is to raise the actual error if there is one.
+                    let res = res.get().unwrap().unwrap()?;
+                    try_from_incoming(res)
+                },
+            )
+            .await?;
+            Ok(body)
+        }
     }
 
     /// Set timeout on connecting to HTTP server
@@ -92,6 +111,7 @@ struct RequestOptions {
     between_bytes_timeout: Option<Duration>,
 }
 
+#[cfg(target_env = "p2")]
 impl RequestOptions {
     fn to_wasi(&self) -> Result<WasiRequestOptions, crate::http::Error> {
         let wasi = WasiRequestOptions::new();
@@ -116,6 +136,23 @@ impl RequestOptions {
                         "wasi-http implementation does not support between byte timeout option",
                     )
                 })?;
+        }
+        Ok(wasi)
+    }
+}
+
+#[cfg(target_env = "p3")]
+impl RequestOptions {
+    fn to_wasi(&self) -> Result<WasiRequestOptions, crate::http::Error> {
+        let wasi = WasiRequestOptions::new();
+        if let Some(timeout) = self.connect_timeout {
+            wasi.set_connect_timeout(Some(timeout.0))?;
+        }
+        if let Some(timeout) = self.first_byte_timeout {
+            wasi.set_first_byte_timeout(Some(timeout.0))?;
+        }
+        if let Some(timeout) = self.between_bytes_timeout {
+            wasi.set_between_bytes_timeout(Some(timeout.0))?;
         }
         Ok(wasi)
     }
