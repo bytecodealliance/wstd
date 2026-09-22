@@ -16,9 +16,9 @@ fn run(component: &str, p3: bool) -> Result<()> {
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let mut stdin = child.stdin.take()?;
-    let mut stdout = BufReader::new(child.stdout.take())?;
-    let mut stderr = BufReader::new(child.stderr.take())?;
+    let mut stdin = child.stdin.take().context("child stdin")?;
+    let mut stdout = BufReader::new(child.stdout.take().context("child stdout")?);
+    let mut stderr = BufReader::new(child.stderr.take().context("child stderr")?);
 
     stdin.write_all(b"hello from stdin\n")?;
     stdin.flush()?;
