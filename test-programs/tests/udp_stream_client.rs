@@ -3,8 +3,7 @@ use std::net::UdpSocket;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-#[test_log::test]
-fn udp_stream_client() -> Result<()> {
+fn run(component: &str, p3: bool) -> Result<()> {
     // Port 0: the host picks a free port, which the component is told about
     // by argument, so this test can't collide with anything else running.
     let server = UdpSocket::bind("127.0.0.1:0").context("binding temporary test server")?;
@@ -17,10 +16,13 @@ fn udp_stream_client() -> Result<()> {
         .local_addr()
         .context("getting local server address")?;
 
-    let child = Command::new("wasmtime")
-        .arg("run")
-        .arg("-Sinherit-network")
-        .arg(test_programs::UDP_STREAM_CLIENT)
+    let mut command = Command::new("wasmtime");
+    command.arg("run").arg("-Sinherit-network");
+    if p3 {
+        command.arg("-Sp3");
+    }
+    let child = command
+        .arg(component)
         .arg(addr.to_string())
         .stderr(Stdio::piped())
         .spawn()
@@ -52,5 +54,18 @@ fn udp_stream_client() -> Result<()> {
         String::from_utf8_lossy(&output.stderr)
     );
 
+    Ok(())
+}
+
+#[test_log::test]
+fn udp_stream_client_p2() -> Result<()> {
+    run(test_programs::UDP_STREAM_CLIENT, false)
+}
+
+#[test_log::test]
+fn udp_stream_client_p3() -> Result<()> {
+    if test_programs::NIGHTLY_TOOLCHAIN {
+        run(test_programs::UDP_STREAM_CLIENT_P3, true)?;
+    }
     Ok(())
 }

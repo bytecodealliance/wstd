@@ -1,5 +1,5 @@
-#![cfg_attr(not(all(target_os = "wasi", target_env = "p2")), no_main)]
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
+#![cfg_attr(not(target_os = "wasi"), no_main)]
+#![cfg(target_os = "wasi")]
 
 use wstd::io::{self, AsyncRead, AsyncWrite};
 use wstd::net::TcpStream;
