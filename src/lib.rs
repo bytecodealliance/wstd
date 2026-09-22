@@ -89,8 +89,8 @@ pub mod __internal {
     pub use wasip3;
 }
 
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod prelude {
+    #[cfg(all(target_os = "wasi", target_env = "p2"))]
     pub use crate::future::FutureExt as _;
     pub use crate::io::AsyncRead as _;
     pub use crate::io::AsyncWrite as _;
