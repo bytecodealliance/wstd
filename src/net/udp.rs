@@ -1,16 +1,22 @@
 use std::io::ErrorKind;
 use std::net::{SocketAddr, ToSocketAddrs};
+#[cfg(target_env = "p2")]
 use std::sync::OnceLock;
 
-use wasip2::sockets::instance_network::instance_network;
-use wasip2::sockets::udp::{
-    IncomingDatagramStream, IpAddressFamily, IpSocketAddress, OutgoingDatagram,
-    OutgoingDatagramStream,
+#[cfg(target_env = "p2")]
+use wasip2::sockets::{
+    instance_network::instance_network,
+    udp::{
+        IncomingDatagramStream, IpAddressFamily, IpSocketAddress, OutgoingDatagram,
+        OutgoingDatagramStream, UdpSocket as WasiUdpSocket,
+    },
 };
-use wasip2::sockets::udp_create_socket::create_udp_socket;
+#[cfg(target_env = "p3")]
+use wasip3::sockets::types::{IpAddressFamily, UdpSocket as WasiUdpSocket};
 
-use super::{sockaddr_from_wasi, sockaddr_to_wasi, to_io_err};
+use super::{create_udp_socket, sockaddr_from_wasi, sockaddr_to_wasi, to_io_err};
 use crate::io;
+#[cfg(target_env = "p2")]
 use crate::runtime::AsyncPollable;
 
 /// A UDP socket, bound to a local address.
@@ -21,9 +27,11 @@ use crate::runtime::AsyncPollable;
 /// single remote address instead, giving a [`UdpStream`].
 #[derive(Debug)]
 pub struct UdpSocket {
+    #[cfg(target_env = "p2")]
     incoming: AsyncIncomingDatagramStream,
+    #[cfg(target_env = "p2")]
     outgoing: AsyncOutgoingDatagramStream,
-    socket: wasip2::sockets::udp::UdpSocket,
+    socket: WasiUdpSocket,
 }
 
 impl UdpSocket {
@@ -34,29 +42,45 @@ impl UdpSocket {
             .map_err(|_| io::Error::other("failed to parse string to socket addr"))?;
         let socket = bind_socket(addr).await?;
 
-        // Datagram streams without a remote address may send to, and receive
-        // from, any address.
-        let (incoming, outgoing) = socket.stream(None).map_err(to_io_err)?;
-        Ok(Self {
-            incoming: AsyncIncomingDatagramStream::new(incoming),
-            outgoing: AsyncOutgoingDatagramStream::new(outgoing),
-            socket,
-        })
+        #[cfg(target_env = "p2")]
+        {
+            // Datagram streams without a remote address may send to, and receive
+            // from, any address.
+            let (incoming, outgoing) = socket.stream(None).map_err(to_io_err)?;
+            Ok(Self {
+                incoming: AsyncIncomingDatagramStream::new(incoming),
+                outgoing: AsyncOutgoingDatagramStream::new(outgoing),
+                socket,
+            })
+        }
+        #[cfg(target_env = "p3")]
+        Ok(Self { socket })
     }
 
     /// Returns the local socket address of this socket.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.socket
-            .local_address()
-            .map_err(to_io_err)
-            .map(sockaddr_from_wasi)
+        #[cfg(target_env = "p2")]
+        let addr = self.socket.local_address();
+        #[cfg(target_env = "p3")]
+        let addr = self.socket.get_local_address();
+        addr.map_err(to_io_err).map(sockaddr_from_wasi)
     }
 
     /// Sends a datagram to the given address.
     pub async fn send_to(&self, buf: &[u8], addr: SocketAddr) -> io::Result<usize> {
-        self.outgoing
+        #[cfg(target_env = "p2")]
+        return self
+            .outgoing
             .send_to(buf, Some(sockaddr_to_wasi(addr)))
-            .await
+            .await;
+        #[cfg(target_env = "p3")]
+        {
+            self.socket
+                .send(buf.to_vec(), Some(sockaddr_to_wasi(addr)))
+                .await
+                .map_err(to_io_err)?;
+            Ok(buf.len())
+        }
     }
 
     /// Receives a single datagram. On success, returns the number of bytes
@@ -64,7 +88,15 @@ impl UdpSocket {
     ///
     /// If `buf` is shorter than the datagram, the excess bytes are discarded.
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.incoming.recv_from(buf).await
+        #[cfg(target_env = "p2")]
+        return self.incoming.recv_from(buf).await;
+        #[cfg(target_env = "p3")]
+        {
+            let (datagram, remote_address) = self.socket.receive().await.map_err(to_io_err)?;
+            let len = datagram.len().min(buf.len());
+            buf[..len].copy_from_slice(&datagram[..len]);
+            Ok((len, sockaddr_from_wasi(remote_address)))
+        }
     }
 
     /// Associates this socket with a remote address, giving a [`UdpStream`]
@@ -73,24 +105,38 @@ impl UdpSocket {
     /// This only changes the local socket configuration, and does not generate
     /// any network traffic.
     pub fn connect(self, addr: SocketAddr) -> io::Result<UdpStream> {
-        // WASI may trap if streams from a previous call to `stream` are still
-        // live, so drop the unconnected streams before creating connected ones.
-        let Self {
-            incoming,
-            outgoing,
-            socket,
-        } = self;
-        drop((incoming, outgoing));
+        #[cfg(target_env = "p2")]
+        {
+            // WASI may trap if streams from a previous call to `stream` are still
+            // live, so drop the unconnected streams before creating connected ones.
+            let Self {
+                incoming,
+                outgoing,
+                socket,
+            } = self;
+            drop((incoming, outgoing));
 
-        let (incoming, outgoing) = socket
-            .stream(Some(sockaddr_to_wasi(addr)))
-            .map_err(to_io_err)?;
-        Ok(UdpStream::new(incoming, outgoing, socket))
+            let (incoming, outgoing) = socket
+                .stream(Some(sockaddr_to_wasi(addr)))
+                .map_err(to_io_err)?;
+            Ok(UdpStream::new(incoming, outgoing, socket))
+        }
+        #[cfg(target_env = "p3")]
+        {
+            self.socket
+                .connect(sockaddr_to_wasi(addr))
+                .map_err(to_io_err)?;
+            Ok(UdpStream::new(self.socket))
+        }
     }
 
     /// Returns the unicast hop limit ("time to live") of this socket.
     pub fn unicast_hop_limit(&self) -> io::Result<u8> {
-        self.socket.unicast_hop_limit().map_err(to_io_err)
+        #[cfg(target_env = "p2")]
+        let result = self.socket.unicast_hop_limit();
+        #[cfg(target_env = "p3")]
+        let result = self.socket.get_unicast_hop_limit();
+        result.map_err(to_io_err)
     }
 
     /// Sets the unicast hop limit ("time to live") of this socket.
@@ -100,7 +146,11 @@ impl UdpSocket {
 
     /// Returns the size of the receive buffer of this socket.
     pub fn receive_buffer_size(&self) -> io::Result<u64> {
-        self.socket.receive_buffer_size().map_err(to_io_err)
+        #[cfg(target_env = "p2")]
+        let result = self.socket.receive_buffer_size();
+        #[cfg(target_env = "p3")]
+        let result = self.socket.get_receive_buffer_size();
+        result.map_err(to_io_err)
     }
 
     /// Sets the size of the receive buffer of this socket. This is a hint: the
@@ -113,7 +163,11 @@ impl UdpSocket {
 
     /// Returns the size of the send buffer of this socket.
     pub fn send_buffer_size(&self) -> io::Result<u64> {
-        self.socket.send_buffer_size().map_err(to_io_err)
+        #[cfg(target_env = "p2")]
+        let result = self.socket.send_buffer_size();
+        #[cfg(target_env = "p3")]
+        let result = self.socket.get_send_buffer_size();
+        result.map_err(to_io_err)
     }
 
     /// Sets the size of the send buffer of this socket. This is a hint: the
@@ -130,22 +184,30 @@ impl UdpSocket {
 /// any other address are not received.
 #[derive(Debug)]
 pub struct UdpStream {
+    #[cfg(target_env = "p2")]
     incoming: AsyncIncomingDatagramStream,
+    #[cfg(target_env = "p2")]
     outgoing: AsyncOutgoingDatagramStream,
-    socket: wasip2::sockets::udp::UdpSocket,
+    socket: WasiUdpSocket,
 }
 
 impl UdpStream {
+    #[cfg(target_env = "p2")]
     fn new(
         incoming: IncomingDatagramStream,
         outgoing: OutgoingDatagramStream,
-        socket: wasip2::sockets::udp::UdpSocket,
+        socket: WasiUdpSocket,
     ) -> Self {
         Self {
             incoming: AsyncIncomingDatagramStream::new(incoming),
             outgoing: AsyncOutgoingDatagramStream::new(outgoing),
             socket,
         }
+    }
+
+    #[cfg(target_env = "p3")]
+    fn new(socket: WasiUdpSocket) -> Self {
+        Self { socket }
     }
 
     /// Associates a UDP socket with a remote host.
@@ -176,31 +238,50 @@ impl UdpStream {
         };
         let socket = bind_socket(local_addr).await?;
 
-        let (incoming, outgoing) = socket
-            .stream(Some(sockaddr_to_wasi(addr)))
-            .map_err(to_io_err)?;
-        Ok(Self::new(incoming, outgoing, socket))
+        #[cfg(target_env = "p2")]
+        {
+            let (incoming, outgoing) = socket
+                .stream(Some(sockaddr_to_wasi(addr)))
+                .map_err(to_io_err)?;
+            Ok(Self::new(incoming, outgoing, socket))
+        }
+        #[cfg(target_env = "p3")]
+        {
+            socket.connect(sockaddr_to_wasi(addr)).map_err(to_io_err)?;
+            Ok(Self::new(socket))
+        }
     }
 
     /// Returns the local socket address of this socket.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.socket
-            .local_address()
-            .map_err(to_io_err)
-            .map(sockaddr_from_wasi)
+        #[cfg(target_env = "p2")]
+        let addr = self.socket.local_address();
+        #[cfg(target_env = "p3")]
+        let addr = self.socket.get_local_address();
+        addr.map_err(to_io_err).map(sockaddr_from_wasi)
     }
 
     /// Returns the socket address of the remote peer of this UDP association.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.socket
-            .remote_address()
-            .map_err(to_io_err)
-            .map(sockaddr_from_wasi)
+        #[cfg(target_env = "p2")]
+        let addr = self.socket.remote_address();
+        #[cfg(target_env = "p3")]
+        let addr = self.socket.get_remote_address();
+        addr.map_err(to_io_err).map(sockaddr_from_wasi)
     }
 
     /// Sends a datagram to the remote peer.
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.outgoing.send_to(buf, None).await
+        #[cfg(target_env = "p2")]
+        return self.outgoing.send_to(buf, None).await;
+        #[cfg(target_env = "p3")]
+        {
+            self.socket
+                .send(buf.to_vec(), None)
+                .await
+                .map_err(to_io_err)?;
+            Ok(buf.len())
+        }
     }
 
     /// Receives a single datagram from the remote peer. On success, returns the
@@ -208,12 +289,24 @@ impl UdpStream {
     ///
     /// If `buf` is shorter than the datagram, the excess bytes are discarded.
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.incoming.recv_from(buf).await.map(|(len, _addr)| len)
+        #[cfg(target_env = "p2")]
+        return self.incoming.recv_from(buf).await.map(|(len, _addr)| len);
+        #[cfg(target_env = "p3")]
+        {
+            let (datagram, _remote_address) = self.socket.receive().await.map_err(to_io_err)?;
+            let len = datagram.len().min(buf.len());
+            buf[..len].copy_from_slice(&datagram[..len]);
+            Ok(len)
+        }
     }
 
     /// Returns the unicast hop limit ("time to live") of this socket.
     pub fn unicast_hop_limit(&self) -> io::Result<u8> {
-        self.socket.unicast_hop_limit().map_err(to_io_err)
+        #[cfg(target_env = "p2")]
+        let result = self.socket.unicast_hop_limit();
+        #[cfg(target_env = "p3")]
+        let result = self.socket.get_unicast_hop_limit();
+        result.map_err(to_io_err)
     }
 
     /// Sets the unicast hop limit ("time to live") of this socket.
@@ -223,7 +316,11 @@ impl UdpStream {
 
     /// Returns the size of the receive buffer of this socket.
     pub fn receive_buffer_size(&self) -> io::Result<u64> {
-        self.socket.receive_buffer_size().map_err(to_io_err)
+        #[cfg(target_env = "p2")]
+        let result = self.socket.receive_buffer_size();
+        #[cfg(target_env = "p3")]
+        let result = self.socket.get_receive_buffer_size();
+        result.map_err(to_io_err)
     }
 
     /// Sets the size of the receive buffer of this socket. This is a hint: the
@@ -236,7 +333,11 @@ impl UdpStream {
 
     /// Returns the size of the send buffer of this socket.
     pub fn send_buffer_size(&self) -> io::Result<u64> {
-        self.socket.send_buffer_size().map_err(to_io_err)
+        #[cfg(target_env = "p2")]
+        let result = self.socket.send_buffer_size();
+        #[cfg(target_env = "p3")]
+        let result = self.socket.get_send_buffer_size();
+        result.map_err(to_io_err)
     }
 
     /// Sets the size of the send buffer of this socket. This is a hint: the
@@ -246,31 +347,38 @@ impl UdpStream {
     }
 }
 
-async fn bind_socket(addr: SocketAddr) -> io::Result<wasip2::sockets::udp::UdpSocket> {
+async fn bind_socket(addr: SocketAddr) -> io::Result<WasiUdpSocket> {
     let family = match addr {
         SocketAddr::V4(_) => IpAddressFamily::Ipv4,
         SocketAddr::V6(_) => IpAddressFamily::Ipv6,
     };
     let socket = create_udp_socket(family).map_err(to_io_err)?;
-    let network = instance_network();
     let local_address = sockaddr_to_wasi(addr);
 
-    socket
-        .start_bind(&network, local_address)
-        .map_err(to_io_err)?;
-    let pollable = AsyncPollable::new(socket.subscribe());
-    pollable.wait_for().await;
-    socket.finish_bind().map_err(to_io_err)?;
+    #[cfg(target_env = "p2")]
+    {
+        let network = instance_network();
+        socket
+            .start_bind(&network, local_address)
+            .map_err(to_io_err)?;
+        let pollable = AsyncPollable::new(socket.subscribe());
+        pollable.wait_for().await;
+        socket.finish_bind().map_err(to_io_err)?;
+    }
+    #[cfg(target_env = "p3")]
+    socket.bind(local_address).map_err(to_io_err)?;
 
     Ok(socket)
 }
 
+#[cfg(target_env = "p2")]
 #[derive(Debug)]
 struct AsyncIncomingDatagramStream {
     subscription: OnceLock<AsyncPollable>,
     stream: IncomingDatagramStream,
 }
 
+#[cfg(target_env = "p2")]
 impl AsyncIncomingDatagramStream {
     fn new(stream: IncomingDatagramStream) -> Self {
         Self {
@@ -310,12 +418,14 @@ impl AsyncIncomingDatagramStream {
     }
 }
 
+#[cfg(target_env = "p2")]
 #[derive(Debug)]
 struct AsyncOutgoingDatagramStream {
     subscription: OnceLock<AsyncPollable>,
     stream: OutgoingDatagramStream,
 }
 
+#[cfg(target_env = "p2")]
 impl AsyncOutgoingDatagramStream {
     fn new(stream: OutgoingDatagramStream) -> Self {
         Self {
