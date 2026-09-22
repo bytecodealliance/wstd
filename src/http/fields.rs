@@ -5,7 +5,9 @@ use wasip2::http::types::Fields;
 
 pub(crate) fn header_map_from_wasi(wasi_fields: Fields) -> Result<HeaderMap, Error> {
     let mut output = HeaderMap::new();
-    for (key, value) in wasi_fields.entries() {
+    let entries = wasi_fields.entries();
+
+    for (key, value) in entries {
         let key =
             HeaderName::from_bytes(key.as_bytes()).with_context(|| format!("header name {key}"))?;
         let value =

@@ -2,12 +2,20 @@ use anyhow::Result;
 
 #[test_log::test]
 fn hello_world() -> Result<()> {
-    run(test_programs::axum::HELLO_WORLD)
+    run(test_programs::axum::HELLO_WORLD)?;
+    if test_programs::NIGHTLY_TOOLCHAIN {
+        run(test_programs::axum::HELLO_WORLD_P3)?;
+    }
+    Ok(())
 }
 
 #[test_log::test]
 fn hello_world_nomacro() -> Result<()> {
-    run(test_programs::axum::HELLO_WORLD_NOMACRO)
+    run(test_programs::axum::HELLO_WORLD_NOMACRO)?;
+    if test_programs::NIGHTLY_TOOLCHAIN {
+        run(test_programs::axum::HELLO_WORLD_NOMACRO_P3)?;
+    }
+    Ok(())
 }
 
 // The hello_world.rs and hello_world_nomacro.rs are identical in

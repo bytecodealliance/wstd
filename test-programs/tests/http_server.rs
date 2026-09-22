@@ -3,10 +3,18 @@ use std::time::{Duration, Instant};
 
 #[test_log::test]
 fn http_server() -> Result<()> {
+    run(test_programs::HTTP_SERVER)?;
+    if test_programs::NIGHTLY_TOOLCHAIN {
+        run(test_programs::HTTP_SERVER_P3)?;
+    }
+    Ok(())
+}
+
+fn run(component: &str) -> Result<()> {
     // Run wasmtime serve.
     // Enable -Scli because we currently don't have a way to build with the
     // proxy adapter, so we build with the default adapter.
-    let _serve = test_programs::WasmtimeServe::new(test_programs::HTTP_SERVER)?;
+    let _serve = test_programs::WasmtimeServe::new(component)?;
 
     // Test each path in the server:
 

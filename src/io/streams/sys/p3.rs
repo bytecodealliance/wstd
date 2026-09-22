@@ -111,7 +111,7 @@ pub struct AsyncInputChunkStream {
 
 enum AsyncInputChunkStreamState {
     Ready(AsyncInputStream),
-    Reading(Pin<Box<dyn Future<Output = AsyncInputChunkReadResult>>>),
+    Reading(Pin<Box<dyn Future<Output = AsyncInputChunkReadResult> + Send>>),
     Done,
 }
 
@@ -282,8 +282,7 @@ impl AsyncWrite for AsyncOutputStream {
     /// # Warning
     ///
     /// This is a no-op on generic p3 streams. Use interface-specific flush
-    /// methods when available (e.g. [`crate::io::Stdout::flush`] or
-    /// [`crate::io::Stderr::flush`]).
+    /// methods when available (e.g. `Stdout::flush` or `Stderr::flush`).
     async fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }

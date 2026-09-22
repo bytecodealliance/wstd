@@ -6,8 +6,16 @@ const COUNT: usize = 2;
 
 #[test_log::test]
 fn weather() -> Result<()> {
+    run(test_programs::axum::WEATHER)?;
+    if test_programs::NIGHTLY_TOOLCHAIN {
+        run(test_programs::axum::WEATHER_P3)?;
+    }
+    Ok(())
+}
+
+fn run(component: &str) -> Result<()> {
     // Run wasmtime serve.
-    let _serve = test_programs::WasmtimeServe::new(test_programs::axum::WEATHER)?;
+    let _serve = test_programs::WasmtimeServe::new(component)?;
 
     // TEST /weather weather handler
     let body = ureq::get(format!(

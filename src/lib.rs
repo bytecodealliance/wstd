@@ -55,9 +55,7 @@
 //! These are unique capabilities provided by WASI 0.2, and because this library
 //! is specific to that are exposed from here.
 
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod future;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 #[macro_use]
 pub mod http;
 pub mod io;
@@ -70,7 +68,6 @@ pub mod task;
 #[cfg(target_os = "wasi")]
 pub mod time;
 
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub use wstd_macro::attr_macro_http_server as http_server;
 
 pub use wstd_macro::{attr_macro_main as main, attr_macro_test as test};
@@ -89,7 +86,6 @@ pub mod __internal {
 }
 
 pub mod prelude {
-    #[cfg(all(target_os = "wasi", target_env = "p2"))]
     pub use crate::future::FutureExt as _;
     pub use crate::io::AsyncRead as _;
     pub use crate::io::AsyncWrite as _;
