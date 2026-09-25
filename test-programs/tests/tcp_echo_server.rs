@@ -1,20 +1,22 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
-#[test_log::test]
-fn tcp_echo_server() -> Result<()> {
+fn run(component: &str, p3: bool) -> Result<()> {
     use std::io::{Read, Write};
     use std::net::{Shutdown, TcpStream};
     use test_programs::get_listening_address;
 
-    println!("testing {}", test_programs::TCP_ECHO_SERVER);
+    println!("testing {component}");
 
     // Run the component in wasmtime
     // -Sinherit-network required for sockets to work
-    let mut wasmtime_process = Command::new("wasmtime")
-        .arg("run")
-        .arg("-Sinherit-network")
-        .arg(test_programs::TCP_ECHO_SERVER)
+    let mut command = Command::new("wasmtime");
+    command.arg("run").arg("-Sinherit-network");
+    if p3 {
+        command.arg("-Sp3");
+    }
+    let mut wasmtime_process = command
+        .arg(component)
         .stdout(std::process::Stdio::piped())
         .spawn()?;
 
@@ -81,5 +83,18 @@ fn tcp_echo_server() -> Result<()> {
 
     wasmtime_process.kill()?;
 
+    Ok(())
+}
+
+#[test_log::test]
+fn tcp_echo_server_p2() -> Result<()> {
+    run(test_programs::TCP_ECHO_SERVER, false)
+}
+
+#[test_log::test]
+fn tcp_echo_server_p3() -> Result<()> {
+    if test_programs::NIGHTLY_TOOLCHAIN {
+        run(test_programs::TCP_ECHO_SERVER_P3, true)?;
+    }
     Ok(())
 }

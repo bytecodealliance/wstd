@@ -1,7 +1,16 @@
 //! Async network abstractions.
 
 use std::io::{self, ErrorKind};
-use wasip2::sockets::network::{ErrorCode, IpSocketAddress, Ipv4SocketAddress};
+#[cfg(target_env = "p2")]
+use wasip2::sockets::{
+    network::{ErrorCode, IpSocketAddress, Ipv4SocketAddress, Ipv6SocketAddress},
+    tcp_create_socket::create_tcp_socket,
+    udp_create_socket::create_udp_socket,
+};
+#[cfg(target_env = "p3")]
+use wasip3::sockets::types::{
+    ErrorCode, IpAddressFamily, IpSocketAddress, Ipv4SocketAddress, Ipv6SocketAddress, TcpSocket,
+};
 
 mod tcp_listener;
 mod tcp_stream;
@@ -13,26 +22,39 @@ pub use udp::*;
 
 fn to_io_err(err: ErrorCode) -> io::Error {
     match err {
-        ErrorCode::Unknown => ErrorKind::Other.into(),
         ErrorCode::AccessDenied => ErrorKind::PermissionDenied.into(),
         ErrorCode::NotSupported => ErrorKind::Unsupported.into(),
         ErrorCode::InvalidArgument => ErrorKind::InvalidInput.into(),
         ErrorCode::OutOfMemory => ErrorKind::OutOfMemory.into(),
         ErrorCode::Timeout => ErrorKind::TimedOut.into(),
-        ErrorCode::WouldBlock => ErrorKind::WouldBlock.into(),
         ErrorCode::InvalidState => ErrorKind::InvalidData.into(),
         ErrorCode::AddressInUse => ErrorKind::AddrInUse.into(),
         ErrorCode::ConnectionRefused => ErrorKind::ConnectionRefused.into(),
         ErrorCode::ConnectionReset => ErrorKind::ConnectionReset.into(),
         ErrorCode::ConnectionAborted => ErrorKind::ConnectionAborted.into(),
-        ErrorCode::ConcurrencyConflict => ErrorKind::AlreadyExists.into(),
         ErrorCode::DatagramTooLarge => ErrorKind::InvalidInput.into(),
+
+        #[cfg(target_env = "p2")]
+        ErrorCode::Unknown => ErrorKind::Other.into(),
+        #[cfg(target_env = "p2")]
+        ErrorCode::WouldBlock => ErrorKind::WouldBlock.into(),
+        #[cfg(target_env = "p2")]
+        ErrorCode::ConcurrencyConflict => ErrorKind::AlreadyExists.into(),
+        #[cfg(target_env = "p2")]
         _ => ErrorKind::Other.into(),
+
+        #[cfg(target_env = "p3")]
+        ErrorCode::AddressNotBindable => ErrorKind::AddrNotAvailable.into(),
+        #[cfg(target_env = "p3")]
+        ErrorCode::RemoteUnreachable => ErrorKind::HostUnreachable.into(),
+        #[cfg(target_env = "p3")]
+        ErrorCode::ConnectionBroken => ErrorKind::BrokenPipe.into(),
+        #[cfg(target_env = "p3")]
+        ErrorCode::Other(s) => io::Error::other(s.unwrap_or_default()),
     }
 }
 
 fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
-    use wasip2::sockets::network::Ipv6SocketAddress;
     match addr {
         IpSocketAddress::Ipv4(Ipv4SocketAddress { address, port }) => {
             std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
@@ -58,7 +80,6 @@ fn sockaddr_from_wasi(addr: IpSocketAddress) -> std::net::SocketAddr {
 }
 
 fn sockaddr_to_wasi(addr: std::net::SocketAddr) -> IpSocketAddress {
-    use wasip2::sockets::network::Ipv6SocketAddress;
     match addr {
         std::net::SocketAddr::V4(addr) => {
             let ip = addr.ip().octets();
@@ -77,4 +98,18 @@ fn sockaddr_to_wasi(addr: std::net::SocketAddr) -> IpSocketAddress {
             })
         }
     }
+}
+
+#[cfg(target_env = "p3")]
+fn create_tcp_socket(
+    family: IpAddressFamily,
+) -> Result<TcpSocket, wasip3::sockets::types::ErrorCode> {
+    TcpSocket::create(family)
+}
+
+#[cfg(target_env = "p3")]
+fn create_udp_socket(
+    family: IpAddressFamily,
+) -> Result<wasip3::sockets::types::UdpSocket, wasip3::sockets::types::ErrorCode> {
+    wasip3::sockets::types::UdpSocket::create(family)
 }
