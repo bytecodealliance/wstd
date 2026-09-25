@@ -78,7 +78,12 @@ impl AsyncInputStream {
     /// Use this `AsyncInputStream` as a `futures_lite::stream::Stream` with
     /// items of `Result<Vec<u8>, std::io::Error>`. The returned byte vectors
     /// will be at most the `chunk_size` argument specified.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `chunk_size` is zero.
     pub fn into_stream_of(self, chunk_size: usize) -> AsyncInputChunkStream {
+        assert!(chunk_size > 0, "chunk size must be non-zero");
         AsyncInputChunkStream {
             stream: self,
             chunk_size,
