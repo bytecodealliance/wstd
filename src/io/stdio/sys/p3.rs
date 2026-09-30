@@ -1,20 +1,14 @@
-use super::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
+use crate::io::{AsyncInputStream, AsyncOutputStream, AsyncRead, AsyncWrite, Result};
 use std::cell::LazyCell;
-#[cfg(target_env = "p3")]
 use std::pin::Pin;
 
-#[cfg(target_env = "p2")]
-use wasip2::cli::{terminal_input::TerminalInput, terminal_output::TerminalOutput};
-#[cfg(target_env = "p3")]
 use wasip3::{
     cli::{terminal_input::TerminalInput, terminal_output::TerminalOutput, types::ErrorCode},
     wit_bindgen::FutureRead,
 };
 
-#[cfg(target_env = "p3")]
 type Completion = FutureRead<std::result::Result<(), ErrorCode>>;
 
-#[cfg(target_env = "p3")]
 fn into_io_error(error: ErrorCode) -> std::io::Error {
     let kind = match error {
         ErrorCode::Io => std::io::ErrorKind::Other,
@@ -25,25 +19,12 @@ fn into_io_error(error: ErrorCode) -> std::io::Error {
 }
 
 /// Use the program's stdin as an `AsyncInputStream`.
-#[cfg_attr(target_env = "p2", derive(Debug))]
 pub struct Stdin {
     stream: AsyncInputStream,
-    #[cfg(target_env = "p3")]
     completion: Pin<Box<Completion>>,
     terminput: LazyCell<Option<TerminalInput>>,
 }
 
-/// Get the program's stdin for use as an `AsyncInputStream`.
-#[cfg(target_env = "p2")]
-pub fn stdin() -> Stdin {
-    let stream = AsyncInputStream::new(wasip2::cli::stdin::get_stdin());
-    Stdin {
-        stream,
-        terminput: LazyCell::new(wasip2::cli::terminal_stdin::get_terminal_stdin),
-    }
-}
-
-#[cfg(target_env = "p3")]
 pub fn stdin() -> Stdin {
     let (stream, completion) = wasip3::cli::stdin::read_via_stream();
     Stdin {
@@ -64,7 +45,6 @@ impl Stdin {
         self.stream
     }
 
-    #[cfg(target_env = "p3")]
     async fn check_error(&mut self) -> Result<()> {
         let (stream, completion) = wasip3::cli::stdin::read_via_stream();
         let old_stream = std::mem::replace(&mut self.stream, AsyncInputStream::new(stream));
@@ -75,7 +55,6 @@ impl Stdin {
     }
 }
 
-#[cfg(target_env = "p3")]
 impl std::fmt::Debug for Stdin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Stdin")
@@ -107,25 +86,12 @@ impl AsyncRead for Stdin {
 }
 
 /// Use the program's stdout as an `AsyncOutputStream`.
-#[cfg_attr(target_env = "p2", derive(Debug))]
 pub struct Stdout {
     stream: AsyncOutputStream,
-    #[cfg(target_env = "p3")]
     completion: Pin<Box<Completion>>,
     termoutput: LazyCell<Option<TerminalOutput>>,
 }
 
-/// Get the program's stdout for use as an `AsyncOutputStream`.
-#[cfg(target_env = "p2")]
-pub fn stdout() -> Stdout {
-    let stream = AsyncOutputStream::new(wasip2::cli::stdout::get_stdout());
-    Stdout {
-        stream,
-        termoutput: LazyCell::new(wasip2::cli::terminal_stdout::get_terminal_stdout),
-    }
-}
-
-#[cfg(target_env = "p3")]
 pub fn stdout() -> Stdout {
     let (tx, rx) = wasip3::wit_stream::new();
     let completion = wasip3::cli::stdout::write_via_stream(rx);
@@ -147,7 +113,6 @@ impl Stdout {
         self.stream
     }
 
-    #[cfg(target_env = "p3")]
     async fn flush(&mut self) -> Result<()> {
         let Self {
             stream, completion, ..
@@ -158,7 +123,6 @@ impl Stdout {
     }
 }
 
-#[cfg(target_env = "p3")]
 impl std::fmt::Debug for Stdout {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Stdout")
@@ -176,14 +140,7 @@ impl AsyncWrite for Stdout {
 
     #[inline]
     async fn flush(&mut self) -> Result<()> {
-        #[cfg(target_env = "p2")]
-        {
-            self.stream.flush().await
-        }
-        #[cfg(target_env = "p3")]
-        {
-            Self::flush(self).await
-        }
+        Self::flush(self).await
     }
 
     #[inline]
@@ -198,25 +155,12 @@ impl AsyncWrite for Stdout {
 }
 
 /// Use the program's stdout as an `AsyncOutputStream`.
-#[cfg_attr(target_env = "p2", derive(Debug))]
 pub struct Stderr {
     stream: AsyncOutputStream,
-    #[cfg(target_env = "p3")]
     completion: Pin<Box<Completion>>,
     termoutput: LazyCell<Option<TerminalOutput>>,
 }
 
-/// Get the program's stdout for use as an `AsyncOutputStream`.
-#[cfg(target_env = "p2")]
-pub fn stderr() -> Stderr {
-    let stream = AsyncOutputStream::new(wasip2::cli::stderr::get_stderr());
-    Stderr {
-        stream,
-        termoutput: LazyCell::new(wasip2::cli::terminal_stderr::get_terminal_stderr),
-    }
-}
-
-#[cfg(target_env = "p3")]
 pub fn stderr() -> Stderr {
     let (tx, rx) = wasip3::wit_stream::new();
     let completion = wasip3::cli::stderr::write_via_stream(rx);
@@ -238,7 +182,6 @@ impl Stderr {
         self.stream
     }
 
-    #[cfg(target_env = "p3")]
     async fn flush(&mut self) -> Result<()> {
         let Self {
             stream, completion, ..
@@ -249,7 +192,6 @@ impl Stderr {
     }
 }
 
-#[cfg(target_env = "p3")]
 impl std::fmt::Debug for Stderr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Stderr")
@@ -267,14 +209,7 @@ impl AsyncWrite for Stderr {
 
     #[inline]
     async fn flush(&mut self) -> Result<()> {
-        #[cfg(target_env = "p2")]
-        {
-            self.stream.flush().await
-        }
-        #[cfg(target_env = "p3")]
-        {
-            Self::flush(self).await
-        }
+        Self::flush(self).await
     }
 
     #[inline]
@@ -285,37 +220,5 @@ impl AsyncWrite for Stderr {
     #[inline]
     fn as_async_output_stream(&mut self) -> Option<&mut AsyncOutputStream> {
         self.stream.as_async_output_stream()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::io::AsyncWrite;
-    use crate::runtime::block_on;
-    #[test]
-    // No internal predicate. Run test with --nocapture and inspect output manually.
-    fn stdout_println_hello_world() {
-        block_on(async {
-            let mut stdout = super::stdout();
-            let term = if stdout.is_terminal() { "is" } else { "is not" };
-            stdout
-                .write_all(format!("hello, world! stdout {term} a terminal\n",).as_bytes())
-                .await
-                .unwrap();
-            stdout.flush().await.unwrap();
-        })
-    }
-    #[test]
-    // No internal predicate. Run test with --nocapture and inspect output manually.
-    fn stderr_println_hello_world() {
-        block_on(async {
-            let mut stderr = super::stderr();
-            let term = if stderr.is_terminal() { "is" } else { "is not" };
-            stderr
-                .write_all(format!("hello, world! stderr {term} a terminal\n",).as_bytes())
-                .await
-                .unwrap();
-            stderr.flush().await.unwrap();
-        })
     }
 }

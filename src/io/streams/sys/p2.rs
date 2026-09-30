@@ -1,4 +1,4 @@
-use super::{AsyncPollable, AsyncRead, AsyncWrite};
+use crate::io::{AsyncPollable, AsyncRead, AsyncWrite};
 use crate::runtime::WaitFor;
 use std::future::{Future, poll_fn};
 use std::pin::Pin;

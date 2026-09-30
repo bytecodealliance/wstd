@@ -1,4 +1,4 @@
-use super::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite};
 
 use wasip3::wit_bindgen::{StreamReader, StreamResult, StreamWriter};
 
