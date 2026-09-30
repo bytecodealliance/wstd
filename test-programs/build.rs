@@ -17,6 +17,13 @@ fn main() {
         meta.workspace_root.as_os_str().to_str().unwrap()
     );
 
+    // TODO: Remove this nightly only cfg once wasm32-wasip3 is available on
+    // stable.
+    println!("cargo::rustc-check-cfg=cfg(wstd_nightly)");
+    if nightly_toolchain {
+        println!("cargo:rustc-cfg=wstd_nightly");
+    }
+
     fn build_target(pkg: &str, manifest: &str, kind: &str, target: &str, out_dir: &Path) {
         // release build is required for aws sdk to not overflow wasm locals
         let status = Command::new("cargo")
@@ -73,7 +80,6 @@ fn main() {
     );
 
     let mut generated_code = "// THIS FILE IS GENERATED CODE\n".to_string();
-    generated_code += &format!("pub const NIGHTLY_TOOLCHAIN: bool = {nightly_toolchain};\n\n");
 
     fn module_for(name: &str, kind: TargetKind, out_dir: &Path, meta: &Package) -> String {
         let mut generated_code = String::new();

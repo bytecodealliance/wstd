@@ -54,12 +54,8 @@ fn stdio_p2() -> Result<()> {
     run(test_programs::STDIO, false)
 }
 
+#[cfg(wstd_nightly)]
 #[test_log::test]
 fn stdio_p3() -> Result<()> {
-    // TODO: Remove this nightly check once wasm32-wasip3 is available on stable.
-    if test_programs::NIGHTLY_TOOLCHAIN {
-        run(test_programs::STDIO_P3, true)?;
-    }
-
-    Ok(())
+    run(test_programs::STDIO_P3, true)
 }
