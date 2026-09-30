@@ -19,6 +19,68 @@ use crate::io;
 #[cfg(target_env = "p2")]
 use crate::runtime::AsyncPollable;
 
+#[cfg(target_env = "p2")]
+mod getters {
+    use super::*;
+
+    pub(super) fn local_address(socket: &WasiUdpSocket) -> io::Result<SocketAddr> {
+        socket
+            .local_address()
+            .map_err(to_io_err)
+            .map(sockaddr_from_wasi)
+    }
+
+    pub(super) fn remote_address(socket: &WasiUdpSocket) -> io::Result<SocketAddr> {
+        socket
+            .remote_address()
+            .map_err(to_io_err)
+            .map(sockaddr_from_wasi)
+    }
+
+    pub(super) fn unicast_hop_limit(socket: &WasiUdpSocket) -> io::Result<u8> {
+        socket.unicast_hop_limit().map_err(to_io_err)
+    }
+
+    pub(super) fn receive_buffer_size(socket: &WasiUdpSocket) -> io::Result<u64> {
+        socket.receive_buffer_size().map_err(to_io_err)
+    }
+
+    pub(super) fn send_buffer_size(socket: &WasiUdpSocket) -> io::Result<u64> {
+        socket.send_buffer_size().map_err(to_io_err)
+    }
+}
+
+#[cfg(target_env = "p3")]
+mod getters {
+    use super::*;
+
+    pub(super) fn local_address(socket: &WasiUdpSocket) -> io::Result<SocketAddr> {
+        socket
+            .get_local_address()
+            .map_err(to_io_err)
+            .map(sockaddr_from_wasi)
+    }
+
+    pub(super) fn remote_address(socket: &WasiUdpSocket) -> io::Result<SocketAddr> {
+        socket
+            .get_remote_address()
+            .map_err(to_io_err)
+            .map(sockaddr_from_wasi)
+    }
+
+    pub(super) fn unicast_hop_limit(socket: &WasiUdpSocket) -> io::Result<u8> {
+        socket.get_unicast_hop_limit().map_err(to_io_err)
+    }
+
+    pub(super) fn receive_buffer_size(socket: &WasiUdpSocket) -> io::Result<u64> {
+        socket.get_receive_buffer_size().map_err(to_io_err)
+    }
+
+    pub(super) fn send_buffer_size(socket: &WasiUdpSocket) -> io::Result<u64> {
+        socket.get_send_buffer_size().map_err(to_io_err)
+    }
+}
+
 /// A UDP socket, bound to a local address.
 ///
 /// A `UdpSocket` is not associated with any remote address, so datagrams can be
@@ -59,11 +121,7 @@ impl UdpSocket {
 
     /// Returns the local socket address of this socket.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        #[cfg(target_env = "p2")]
-        let addr = self.socket.local_address();
-        #[cfg(target_env = "p3")]
-        let addr = self.socket.get_local_address();
-        addr.map_err(to_io_err).map(sockaddr_from_wasi)
+        getters::local_address(&self.socket)
     }
 
     /// Sends a datagram to the given address.
@@ -132,11 +190,7 @@ impl UdpSocket {
 
     /// Returns the unicast hop limit ("time to live") of this socket.
     pub fn unicast_hop_limit(&self) -> io::Result<u8> {
-        #[cfg(target_env = "p2")]
-        let result = self.socket.unicast_hop_limit();
-        #[cfg(target_env = "p3")]
-        let result = self.socket.get_unicast_hop_limit();
-        result.map_err(to_io_err)
+        getters::unicast_hop_limit(&self.socket)
     }
 
     /// Sets the unicast hop limit ("time to live") of this socket.
@@ -146,11 +200,7 @@ impl UdpSocket {
 
     /// Returns the size of the receive buffer of this socket.
     pub fn receive_buffer_size(&self) -> io::Result<u64> {
-        #[cfg(target_env = "p2")]
-        let result = self.socket.receive_buffer_size();
-        #[cfg(target_env = "p3")]
-        let result = self.socket.get_receive_buffer_size();
-        result.map_err(to_io_err)
+        getters::receive_buffer_size(&self.socket)
     }
 
     /// Sets the size of the receive buffer of this socket. This is a hint: the
@@ -163,11 +213,7 @@ impl UdpSocket {
 
     /// Returns the size of the send buffer of this socket.
     pub fn send_buffer_size(&self) -> io::Result<u64> {
-        #[cfg(target_env = "p2")]
-        let result = self.socket.send_buffer_size();
-        #[cfg(target_env = "p3")]
-        let result = self.socket.get_send_buffer_size();
-        result.map_err(to_io_err)
+        getters::send_buffer_size(&self.socket)
     }
 
     /// Sets the size of the send buffer of this socket. This is a hint: the
@@ -254,20 +300,12 @@ impl UdpStream {
 
     /// Returns the local socket address of this socket.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        #[cfg(target_env = "p2")]
-        let addr = self.socket.local_address();
-        #[cfg(target_env = "p3")]
-        let addr = self.socket.get_local_address();
-        addr.map_err(to_io_err).map(sockaddr_from_wasi)
+        getters::local_address(&self.socket)
     }
 
     /// Returns the socket address of the remote peer of this UDP association.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        #[cfg(target_env = "p2")]
-        let addr = self.socket.remote_address();
-        #[cfg(target_env = "p3")]
-        let addr = self.socket.get_remote_address();
-        addr.map_err(to_io_err).map(sockaddr_from_wasi)
+        getters::remote_address(&self.socket)
     }
 
     /// Sends a datagram to the remote peer.
@@ -302,11 +340,7 @@ impl UdpStream {
 
     /// Returns the unicast hop limit ("time to live") of this socket.
     pub fn unicast_hop_limit(&self) -> io::Result<u8> {
-        #[cfg(target_env = "p2")]
-        let result = self.socket.unicast_hop_limit();
-        #[cfg(target_env = "p3")]
-        let result = self.socket.get_unicast_hop_limit();
-        result.map_err(to_io_err)
+        getters::unicast_hop_limit(&self.socket)
     }
 
     /// Sets the unicast hop limit ("time to live") of this socket.
@@ -316,11 +350,7 @@ impl UdpStream {
 
     /// Returns the size of the receive buffer of this socket.
     pub fn receive_buffer_size(&self) -> io::Result<u64> {
-        #[cfg(target_env = "p2")]
-        let result = self.socket.receive_buffer_size();
-        #[cfg(target_env = "p3")]
-        let result = self.socket.get_receive_buffer_size();
-        result.map_err(to_io_err)
+        getters::receive_buffer_size(&self.socket)
     }
 
     /// Sets the size of the receive buffer of this socket. This is a hint: the
@@ -333,11 +363,7 @@ impl UdpStream {
 
     /// Returns the size of the send buffer of this socket.
     pub fn send_buffer_size(&self) -> io::Result<u64> {
-        #[cfg(target_env = "p2")]
-        let result = self.socket.send_buffer_size();
-        #[cfg(target_env = "p3")]
-        let result = self.socket.get_send_buffer_size();
-        result.map_err(to_io_err)
+        getters::send_buffer_size(&self.socket)
     }
 
     /// Sets the size of the send buffer of this socket. This is a hint: the
