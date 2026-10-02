@@ -2,14 +2,16 @@ use anyhow::Result;
 
 #[test_log::test]
 fn http_server_proxy() -> Result<()> {
-    run(test_programs::HTTP_SERVER, test_programs::HTTP_SERVER_PROXY)?;
-    if test_programs::NIGHTLY_TOOLCHAIN {
-        run(
-            test_programs::HTTP_SERVER_P3,
-            test_programs::HTTP_SERVER_PROXY_P3,
-        )?;
-    }
-    Ok(())
+    run(test_programs::HTTP_SERVER, test_programs::HTTP_SERVER_PROXY)
+}
+
+#[cfg(wstd_nightly)]
+#[test_log::test]
+fn http_server_proxy_p3() -> Result<()> {
+    run(
+        test_programs::HTTP_SERVER_P3,
+        test_programs::HTTP_SERVER_PROXY_P3,
+    )
 }
 
 fn run(server: &str, proxy: &str) -> Result<()> {

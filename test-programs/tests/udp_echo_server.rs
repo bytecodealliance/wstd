@@ -20,7 +20,7 @@ fn run(component: &str, p3: bool) -> Result<()> {
         .spawn()?;
 
     let addr = test_programs::get_listening_address(
-        wasmtime_process.stdout.take().expect("stdout is piped"),
+        wasmtime_process.stdout.as_mut().expect("stdout is piped"),
     )?;
 
     println!("udp echo server is listening on {addr:?}");

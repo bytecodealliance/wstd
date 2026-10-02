@@ -1,34 +1,40 @@
 use anyhow::Result;
+use test_programs::get_listening_address;
 
 #[test_log::test]
 fn hello_world() -> Result<()> {
-    run(test_programs::axum::HELLO_WORLD)?;
-    if test_programs::NIGHTLY_TOOLCHAIN {
-        run(test_programs::axum::HELLO_WORLD_P3)?;
-    }
-    Ok(())
+    run(test_programs::axum::HELLO_WORLD)
+}
+
+#[cfg(wstd_nightly)]
+#[test_log::test]
+fn hello_world_p3() -> Result<()> {
+    run(test_programs::axum::HELLO_WORLD_P3)
 }
 
 #[test_log::test]
 fn hello_world_nomacro() -> Result<()> {
-    run(test_programs::axum::HELLO_WORLD_NOMACRO)?;
-    if test_programs::NIGHTLY_TOOLCHAIN {
-        run(test_programs::axum::HELLO_WORLD_NOMACRO_P3)?;
-    }
-    Ok(())
+    run(test_programs::axum::HELLO_WORLD_NOMACRO)
+}
+
+#[cfg(wstd_nightly)]
+#[test_log::test]
+fn hello_world_nomacro_p3() -> Result<()> {
+    run(test_programs::axum::HELLO_WORLD_NOMACRO_P3)
 }
 
 // The hello_world.rs and hello_world_nomacro.rs are identical in
 // functionality
 fn run(guest: &str) -> Result<()> {
     // Run wasmtime serve.
-    let _serve = test_programs::WasmtimeServe::new(guest)?;
+    let serve = test_programs::WasmtimeServe::new(guest)?;
+    let addr = serve.get_listening_address();
 
     // Test each path in the server:
 
     // TEST / handler
     // Response body is the hard-coded default
-    let body: String = ureq::get("http://127.0.0.1:8081")
+    let body: String = ureq::get(format!("http://{}", addr))
         .call()?
         .body_mut()
         .read_to_string()?;

@@ -1,4 +1,4 @@
-use crate::http::body::Body;
+use crate::http::body::{Body, BodyHint};
 use crate::http::error::{Error, ErrorCode};
 
 pub use http::response::{Builder, Response};
