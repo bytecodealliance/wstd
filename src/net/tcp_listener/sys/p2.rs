@@ -11,7 +11,6 @@ use crate::runtime::AsyncPollable;
 #[derive(Debug)]
 pub struct TcpListener {
     // Field order matters: must drop this child before parent below
-    #[cfg(target_env = "p2")]
     pollable: AsyncPollable,
     socket: TcpSocket,
 }
@@ -47,10 +46,7 @@ impl TcpListener {
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<std::net::SocketAddr> {
-        #[cfg(target_env = "p2")]
         let addr = self.socket.local_address();
-        #[cfg(target_env = "p3")]
-        let addr = self.socket.get_local_address();
         addr.map_err(to_io_err).map(sockaddr_from_wasi)
     }
 

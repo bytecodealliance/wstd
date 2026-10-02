@@ -55,10 +55,9 @@ impl UdpSocket {
 
     /// Sends a datagram to the given address.
     pub async fn send_to(&self, buf: &[u8], addr: SocketAddr) -> io::Result<usize> {
-        return self
-            .outgoing
+        self.outgoing
             .send_to(buf, Some(sockaddr_to_wasi(addr)))
-            .await;
+            .await
     }
 
     /// Receives a single datagram. On success, returns the number of bytes
@@ -66,7 +65,7 @@ impl UdpSocket {
     ///
     /// If `buf` is shorter than the datagram, the excess bytes are discarded.
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        return self.incoming.recv_from(buf).await;
+        self.incoming.recv_from(buf).await
     }
 
     /// Associates this socket with a remote address, giving a [`UdpStream`]
