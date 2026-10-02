@@ -12,9 +12,44 @@ use wasip3::sockets::types::{
     ErrorCode, IpAddressFamily, IpSocketAddress, Ipv4SocketAddress, Ipv6SocketAddress, TcpSocket,
 };
 
-mod tcp_listener;
-mod tcp_stream;
-mod udp;
+mod tcp_listener {
+    mod sys {
+        #[cfg(target_env = "p2")]
+        pub(super) mod p2;
+        #[cfg(target_env = "p3")]
+        pub(super) mod p3;
+    }
+    #[cfg(target_env = "p2")]
+    pub use sys::p2::*;
+    #[cfg(target_env = "p3")]
+    pub use sys::p3::*;
+}
+
+mod tcp_stream {
+    mod sys {
+        #[cfg(target_env = "p2")]
+        pub(super) mod p2;
+        #[cfg(target_env = "p3")]
+        pub(super) mod p3;
+    }
+    #[cfg(target_env = "p2")]
+    pub use sys::p2::*;
+    #[cfg(target_env = "p3")]
+    pub use sys::p3::*;
+}
+
+mod udp {
+    mod sys {
+        #[cfg(target_env = "p2")]
+        pub(super) mod p2;
+        #[cfg(target_env = "p3")]
+        pub(super) mod p3;
+    }
+    #[cfg(target_env = "p2")]
+    pub use sys::p2::*;
+    #[cfg(target_env = "p3")]
+    pub use sys::p3::*;
+}
 
 pub use tcp_listener::*;
 pub use tcp_stream::*;

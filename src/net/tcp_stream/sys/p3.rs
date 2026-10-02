@@ -1,27 +1,12 @@
 use std::io::ErrorKind;
 use std::net::{SocketAddr, ToSocketAddrs};
 
-#[cfg(target_env = "p2")]
-use wasip2::{
-    io::streams::{InputStream, OutputStream},
-    sockets::{
-        instance_network::instance_network,
-        network::Ipv4SocketAddress,
-        tcp::{IpAddressFamily, IpSocketAddress, TcpSocket},
-    },
-};
-
-#[cfg(target_env = "p3")]
 use wasip3::sockets::types::{IpAddressFamily, IpSocketAddress, Ipv4SocketAddress, TcpSocket};
-#[cfg(target_env = "p3")]
 type InputStream = wasip3::wit_bindgen::StreamReader<u8>;
-#[cfg(target_env = "p3")]
 type OutputStream = wasip3::wit_bindgen::StreamWriter<u8>;
 
-use super::{create_tcp_socket, to_io_err};
 use crate::io::{self, AsyncInputStream, AsyncOutputStream};
-#[cfg(target_env = "p2")]
-use crate::runtime::AsyncPollable;
+use crate::net::{create_tcp_socket, to_io_err};
 
 /// A TCP stream between a local and a remote socket.
 pub struct TcpStream {
@@ -79,32 +64,15 @@ impl TcpStream {
             }
             SocketAddr::V6(_) => todo!("IPv6 not yet supported in `wstd::net::TcpStream`"),
         };
-        #[cfg(target_env = "p2")]
-        {
-            let network = instance_network();
-            socket
-                .start_connect(&network, remote_address)
-                .map_err(to_io_err)?;
-            let pollable = AsyncPollable::new(socket.subscribe());
-            pollable.wait_for().await;
-            let (input, output) = socket.finish_connect().map_err(to_io_err)?;
-            Ok(TcpStream::new(input, output, socket))
-        }
-        #[cfg(target_env = "p3")]
-        {
-            socket.connect(remote_address).await.map_err(to_io_err)?;
-            let (input, _receive_result) = socket.receive();
-            let (output, receiver) = wasip3::wit_stream::new();
-            let _send_result = socket.send(receiver);
-            Ok(TcpStream::new(input, output, socket))
-        }
+        socket.connect(remote_address).await.map_err(to_io_err)?;
+        let (input, _receive_result) = socket.receive();
+        let (output, receiver) = wasip3::wit_stream::new();
+        let _send_result = socket.send(receiver);
+        Ok(TcpStream::new(input, output, socket))
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.
     pub fn peer_addr(&self) -> io::Result<String> {
-        #[cfg(target_env = "p2")]
-        let addr = self.socket.remote_address().map_err(to_io_err)?;
-        #[cfg(target_env = "p3")]
         let addr = self.socket.get_remote_address().map_err(to_io_err)?;
         Ok(format!("{addr:?}"))
     }
@@ -113,24 +81,11 @@ impl TcpStream {
         (
             ReadHalf {
                 stream: &mut self.input,
-                #[cfg(target_env = "p2")]
-                socket: &self.socket,
             },
             WriteHalf {
                 stream: &mut self.output,
-                #[cfg(target_env = "p2")]
-                socket: &self.socket,
             },
         )
-    }
-}
-
-#[cfg(target_env = "p2")]
-impl Drop for TcpStream {
-    fn drop(&mut self) {
-        let _ = self
-            .socket
-            .shutdown(wasip2::sockets::tcp::ShutdownType::Both);
     }
 }
 
@@ -160,17 +115,6 @@ impl io::AsyncWrite for TcpStream {
 
 pub struct ReadHalf<'a> {
     stream: &'a mut AsyncInputStream,
-    #[cfg(target_env = "p2")]
-    socket: &'a TcpSocket,
-}
-
-#[cfg(target_env = "p2")]
-impl<'a> Drop for ReadHalf<'a> {
-    fn drop(&mut self) {
-        let _ = self
-            .socket
-            .shutdown(wasip2::sockets::tcp::ShutdownType::Receive);
-    }
 }
 
 impl<'a> io::AsyncRead for ReadHalf<'a> {
@@ -185,8 +129,6 @@ impl<'a> io::AsyncRead for ReadHalf<'a> {
 
 pub struct WriteHalf<'a> {
     stream: &'a mut AsyncOutputStream,
-    #[cfg(target_env = "p2")]
-    socket: &'a TcpSocket,
 }
 
 impl<'a> io::AsyncWrite for WriteHalf<'a> {
@@ -200,14 +142,5 @@ impl<'a> io::AsyncWrite for WriteHalf<'a> {
 
     fn as_async_output_stream(&mut self) -> Option<&mut AsyncOutputStream> {
         self.stream.as_async_output_stream()
-    }
-}
-
-#[cfg(target_env = "p2")]
-impl<'a> Drop for WriteHalf<'a> {
-    fn drop(&mut self) {
-        let _ = self
-            .socket
-            .shutdown(wasip2::sockets::tcp::ShutdownType::Send);
     }
 }
