@@ -1,14 +1,14 @@
-#![cfg_attr(not(all(target_os = "wasi", target_env = "p2")), no_main)]
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
+#![cfg_attr(not(target_os = "wasi"), no_main)]
+#![cfg(target_os = "wasi")]
 
 use wstd::io;
 use wstd::net::UdpSocket;
 
 #[wstd::main]
 async fn main() -> io::Result<()> {
-    let socket = UdpSocket::bind("127.0.0.1:8080").await?;
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
     println!("Listening on {}", socket.local_addr()?);
-    println!("type `nc -u localhost 8080` to create a UDP client");
+    println!("type `nc -u localhost <PORT>` to create a UDP client");
 
     let mut buf = vec![0; 65535];
     loop {
