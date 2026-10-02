@@ -1,4 +1,4 @@
-pub use super::Method;
+use http::Method;
 use http::method::InvalidMethod;
 use wasip2::http::types::Method as WasiMethod;
 
