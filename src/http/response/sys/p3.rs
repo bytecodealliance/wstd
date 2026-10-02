@@ -1,5 +1,5 @@
-use crate::http::body::{Body, BodyHint};
-use crate::http::error::Error;
+use crate::http::body::Body;
+use crate::http::error::{Error, ErrorCode};
 
 pub use http::response::{Builder, Response};
 
@@ -14,9 +14,9 @@ where
 
 /// Convert an application error into a WASI HTTP error code.
 #[doc(hidden)]
-pub fn error_code(error: Error) -> super::error::ErrorCode {
+pub fn error_code(error: Error) -> ErrorCode {
     error
-        .downcast_ref::<super::error::ErrorCode>()
+        .downcast_ref::<ErrorCode>()
         .cloned()
-        .unwrap_or_else(|| super::error::ErrorCode::InternalError(Some(format!("{error:?}"))))
+        .unwrap_or_else(|| ErrorCode::InternalError(Some(format!("{error:?}"))))
 }
