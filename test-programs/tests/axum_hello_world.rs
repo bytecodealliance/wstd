@@ -1,5 +1,4 @@
 use anyhow::Result;
-use test_programs::get_listening_address;
 
 #[test_log::test]
 fn hello_world() -> Result<()> {
