@@ -1,7 +1,6 @@
-use wasip2::http::types::Scheme as WasiScheme;
-
-pub use http::uri::{InvalidUri, Scheme};
+use http::uri::{InvalidUri, Scheme};
 use std::str::FromStr;
+use wasip2::http::types::Scheme as WasiScheme;
 
 pub(crate) fn to_wasi_scheme(value: &Scheme) -> WasiScheme {
     match value.as_str() {

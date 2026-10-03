@@ -1,7 +1,6 @@
-use wasip2::http::types::Method as WasiMethod;
-
-pub use http::Method;
+use http::Method;
 use http::method::InvalidMethod;
+use wasip2::http::types::Method as WasiMethod;
 
 pub(crate) fn to_wasi_method(value: Method) -> WasiMethod {
     match value {

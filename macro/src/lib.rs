@@ -121,8 +121,10 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
     }
 
     quote! {
+        #[cfg(target_env = "p2")]
         struct TheServer;
 
+        #[cfg(target_env = "p2")]
         impl ::wstd::__internal::wasip2::exports::http::incoming_handler::Guest for TheServer {
             fn handle(
                 request: ::wstd::__internal::wasip2::http::types::IncomingRequest,
@@ -146,7 +148,38 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
             }
         }
 
+        #[cfg(target_env = "p2")]
         ::wstd::__internal::wasip2::http::proxy::export!(TheServer with_types_in ::wstd::__internal::wasip2);
+
+        #[cfg(target_env = "p3")]
+        struct TheServer;
+
+        #[cfg(target_env = "p3")]
+        impl ::wstd::__internal::wasip3::exports::http::handler::Guest for TheServer {
+            async fn handle(
+                request: ::wstd::__internal::wasip3::http::types::Request,
+            ) -> ::core::result::Result<
+                ::wstd::__internal::wasip3::http::types::Response,
+                ::wstd::__internal::wasip3::http::types::ErrorCode,
+            > {
+                #(#attrs)*
+                #vis #run_async fn __run(#inputs) #output {
+                    #body
+                }
+
+                let request = ::wstd::http::request::try_from_incoming(request)
+                    .map_err(::wstd::http::response::error_code)?;
+                let response = __run(request) #run_await
+                    .map_err(::wstd::http::response::error_code)?;
+                ::wstd::http::response::try_into_outgoing(response)
+                    .map_err(::wstd::http::response::error_code)
+            }
+        }
+
+        #[cfg(target_env = "p3")]
+        ::wstd::__internal::wasip3::http::service::export!(
+            TheServer with_types_in ::wstd::__internal::wasip3
+        );
 
         // Provide an actual function named `main`.
         //
