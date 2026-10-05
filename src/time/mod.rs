@@ -1,5 +1,6 @@
 //! Async time interfaces.
 
+#[cfg(target_env = "p2")]
 pub(crate) mod utils;
 
 mod duration;
@@ -171,7 +172,7 @@ mod timer {
 
     /// Future created by [`Timer::wait`].
     #[must_use = "futures do nothing unless polled or .awaited"]
-    pub struct Wait(Pin<Box<dyn Future<Output = ()> + Send>>);
+    pub struct Wait(Pin<Box<dyn Future<Output = ()>>>);
 
     impl Future for Wait {
         type Output = Instant;

@@ -1,8 +1,8 @@
 //! Async event loop support.
 //!
-//! On WASI 0.2 the way to use this is to call `block_on()`. Inside the
-//! future, `Reactor::current` will give an instance of the `Reactor`
-//! running the event loop, which can be used to call `AsyncPollable::wait_for` on
+//! On WASI 0.2 the way to use this is to call [`block_on()`]. Inside the
+//! future, [`Reactor::current`] will give an instance of the [`Reactor`]
+//! running the event loop, which can be used to [`AsyncPollable::wait_for`]
 //! instances of
 //! [`wasip2::Pollable`](https://docs.rs/wasi/latest/wasi/io/poll/struct.Pollable.html).
 //! This will automatically wait for the futures to resolve, and call the

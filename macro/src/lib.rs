@@ -121,7 +121,6 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
     }
 
     quote! {
-        #[cfg(target_env = "p2")]
         struct TheServer;
 
         #[cfg(target_env = "p2")]
@@ -150,9 +149,6 @@ pub fn attr_macro_http_server(_attr: TokenStream, item: TokenStream) -> TokenStr
 
         #[cfg(target_env = "p2")]
         ::wstd::__internal::wasip2::http::proxy::export!(TheServer with_types_in ::wstd::__internal::wasip2);
-
-        #[cfg(target_env = "p3")]
-        struct TheServer;
 
         #[cfg(target_env = "p3")]
         impl ::wstd::__internal::wasip3::exports::http::handler::Guest for TheServer {
