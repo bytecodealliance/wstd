@@ -1,14 +1,10 @@
 include!(concat!(env!("OUT_DIR"), "/gen.rs"));
 
 use anyhow::{Context, Result, bail};
-use std::fs::File;
 use std::net::TcpStream;
 use std::process::{Child, Command};
 use std::thread::sleep;
 use std::time::Duration;
-
-// Required until msrv over 1.89, at which point locking is available in std
-use fs2::FileExt;
 
 /// Manages exclusive access to port 8081, and kills the process when dropped
 pub struct WasmtimeServe {
