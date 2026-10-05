@@ -1,5 +1,3 @@
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
-
 use wstd::http::{Body, Client, Request, error::ErrorCode};
 
 /// Test that `outgoing_handler::handle` errors are properly propagated.

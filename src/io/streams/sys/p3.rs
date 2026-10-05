@@ -111,7 +111,7 @@ pub struct AsyncInputChunkStream {
 
 enum AsyncInputChunkStreamState {
     Ready(AsyncInputStream),
-    Reading(Pin<Box<dyn Future<Output = AsyncInputChunkReadResult>>>),
+    Reading(Pin<Box<dyn Future<Output = AsyncInputChunkReadResult> + Send>>),
     Done,
 }
 
