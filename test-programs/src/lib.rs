@@ -10,12 +10,8 @@ use std::time::Duration;
 // Required until msrv over 1.89, at which point locking is available in std
 use fs2::FileExt;
 
-const DEFAULT_SERVER_PORT: u16 = 0;
-
 /// Manages exclusive access to port 8081, and kills the process when dropped
 pub struct WasmtimeServe {
-    #[expect(dead_code, reason = "exists to live for as long as wasmtime process")]
-    lockfile: File,
     process: Child,
     addr: Option<std::net::SocketAddr>,
 }
@@ -29,21 +25,15 @@ impl WasmtimeServe {
     ///
     /// Kills the wasmtime process, and releases the lock, once dropped.
     pub fn new(guest: &str) -> std::io::Result<Self> {
-        Self::new_with_config(guest, DEFAULT_SERVER_PORT, &[])
+        Self::new_with_config(guest, &[])
     }
 
-    pub fn new_with_config(guest: &str, port: u16, env_vars: &[&str]) -> std::io::Result<Self> {
-        let mut lockfile = std::env::temp_dir();
-        lockfile.push(format!("TEST_PROGRAMS_WASMTIME_SERVE_{port}.lock"));
-        let lockfile = File::create(&lockfile)?;
-        // Once msrv reaches 1.89, replace with std's `.lock()` method
-        lockfile.lock_exclusive()?;
-
+    pub fn new_with_config(guest: &str, env_vars: &[&str]) -> std::io::Result<Self> {
         // Run wasmtime serve.
         // Enable -Scli because we currently don't have a way to build with the
         // proxy adapter, so we build with the default adapter.
         let mut process = Command::new("wasmtime");
-        let listening_addr = format!("127.0.0.1:{port}");
+        let listening_addr = format!("127.0.0.1:0");
         process
             .arg("serve")
             .arg("-Scli")
@@ -57,7 +47,6 @@ impl WasmtimeServe {
             .stderr(std::process::Stdio::piped())
             .spawn()?;
         let mut w = WasmtimeServe {
-            lockfile,
             process,
             addr: None,
         };
