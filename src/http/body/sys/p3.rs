@@ -64,7 +64,9 @@ impl Body {
                 );
                 let body = match previous {
                     BodyInner::Boxed(body) | BodyInner::Incoming { body, .. } => body,
-                    BodyInner::Complete { .. } => unreachable!(),
+                    BodyInner::Complete { .. } => {
+                        unreachable!("BodyInner::Complete case was already handled")
+                    }
                 };
                 let collected = body.collect().await?;
                 let trailers = collected.trailers().cloned();
@@ -73,7 +75,7 @@ impl Body {
                     trailers,
                 };
                 let BodyInner::Complete { data, .. } = inner else {
-                    unreachable!()
+                    unreachable!("State was just set to Complete")
                 };
                 Ok(data)
             }
@@ -84,7 +86,7 @@ impl Body {
     pub async fn bytes_contents(&mut self) -> Result<Bytes, Error> {
         self.contents().await?;
         let BodyInner::Complete { data, .. } = &self.0 else {
-            unreachable!()
+            unreachable!("Reading body was completed")
         };
         Ok(data.clone())
     }

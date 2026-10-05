@@ -1,6 +1,5 @@
 //! Async time interfaces.
 
-#[cfg(target_env = "p2")]
 pub(crate) mod utils;
 
 mod duration;
