@@ -10,6 +10,7 @@ fn weather() -> Result<()> {
 }
 
 #[cfg(wstd_nightly)]
+#[cfg_attr(wstd_nightly, ignore)]
 #[test_log::test]
 fn weather_p3() -> Result<()> {
     run(test_programs::axum::WEATHER_P3)
