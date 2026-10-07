@@ -4,7 +4,7 @@ use crate::io;
 use crate::iter::AsyncIterator;
 use std::net::SocketAddr;
 
-use super::{TcpStream, sockaddr_from_wasi, sockaddr_to_wasi, to_io_err};
+use crate::net::{TcpStream, create_tcp_socket, sockaddr_from_wasi, sockaddr_to_wasi, to_io_err};
 use crate::runtime::AsyncPollable;
 
 /// A TCP socket server, listening for connections.
@@ -27,12 +27,10 @@ impl TcpListener {
             SocketAddr::V4(_) => IpAddressFamily::Ipv4,
             SocketAddr::V6(_) => IpAddressFamily::Ipv6,
         };
-        let socket =
-            wasip2::sockets::tcp_create_socket::create_tcp_socket(family).map_err(to_io_err)?;
-        let network = wasip2::sockets::instance_network::instance_network();
-
+        let socket = create_tcp_socket(family).map_err(to_io_err)?;
         let local_address = sockaddr_to_wasi(addr);
 
+        let network = wasip2::sockets::instance_network::instance_network();
         socket
             .start_bind(&network, local_address)
             .map_err(to_io_err)?;
@@ -48,10 +46,8 @@ impl TcpListener {
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<std::net::SocketAddr> {
-        self.socket
-            .local_address()
-            .map_err(to_io_err)
-            .map(sockaddr_from_wasi)
+        let addr = self.socket.local_address();
+        addr.map_err(to_io_err).map(sockaddr_from_wasi)
     }
 
     /// Returns an iterator over the connections being received on this listener.

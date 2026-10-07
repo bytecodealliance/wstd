@@ -1,19 +1,21 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
-#[test_log::test]
-fn udp_echo_server() -> Result<()> {
+fn run(component: &str, p3: bool) -> Result<()> {
     use std::net::{SocketAddr, UdpSocket};
     use std::time::Duration;
 
-    println!("testing {}", test_programs::UDP_ECHO_SERVER);
+    println!("testing {component}");
 
     // Run the component in wasmtime
     // -Sinherit-network required for sockets to work
-    let mut wasmtime_process = Command::new("wasmtime")
-        .arg("run")
-        .arg("-Sinherit-network")
-        .arg(test_programs::UDP_ECHO_SERVER)
+    let mut command = Command::new("wasmtime");
+    command.arg("run").arg("-Sinherit-network");
+    if p3 {
+        command.arg("-Sp3");
+    }
+    let mut wasmtime_process = command
+        .arg(component)
         .stdout(std::process::Stdio::piped())
         .spawn()?;
 
@@ -63,4 +65,15 @@ fn udp_echo_server() -> Result<()> {
     wasmtime_process.kill()?;
 
     Ok(())
+}
+
+#[test_log::test]
+fn udp_echo_server_p2() -> Result<()> {
+    run(test_programs::UDP_ECHO_SERVER, false)
+}
+
+#[cfg(wstd_nightly)]
+#[test_log::test]
+fn udp_echo_server_p3() -> Result<()> {
+    run(test_programs::UDP_ECHO_SERVER_P3, true)
 }

@@ -2,15 +2,16 @@ use std::io::ErrorKind;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::OnceLock;
 
-use wasip2::sockets::instance_network::instance_network;
-use wasip2::sockets::udp::{
-    IncomingDatagramStream, IpAddressFamily, IpSocketAddress, OutgoingDatagram,
-    OutgoingDatagramStream,
+use wasip2::sockets::{
+    instance_network::instance_network,
+    udp::{
+        IncomingDatagramStream, IpAddressFamily, IpSocketAddress, OutgoingDatagram,
+        OutgoingDatagramStream, UdpSocket as WasiUdpSocket,
+    },
 };
-use wasip2::sockets::udp_create_socket::create_udp_socket;
 
-use super::{sockaddr_from_wasi, sockaddr_to_wasi, to_io_err};
 use crate::io;
+use crate::net::{create_udp_socket, sockaddr_from_wasi, sockaddr_to_wasi, to_io_err};
 use crate::runtime::AsyncPollable;
 
 /// A UDP socket, bound to a local address.
@@ -23,7 +24,7 @@ use crate::runtime::AsyncPollable;
 pub struct UdpSocket {
     incoming: AsyncIncomingDatagramStream,
     outgoing: AsyncOutgoingDatagramStream,
-    socket: wasip2::sockets::udp::UdpSocket,
+    socket: WasiUdpSocket,
 }
 
 impl UdpSocket {
@@ -132,14 +133,14 @@ impl UdpSocket {
 pub struct UdpStream {
     incoming: AsyncIncomingDatagramStream,
     outgoing: AsyncOutgoingDatagramStream,
-    socket: wasip2::sockets::udp::UdpSocket,
+    socket: WasiUdpSocket,
 }
 
 impl UdpStream {
     fn new(
         incoming: IncomingDatagramStream,
         outgoing: OutgoingDatagramStream,
-        socket: wasip2::sockets::udp::UdpSocket,
+        socket: WasiUdpSocket,
     ) -> Self {
         Self {
             incoming: AsyncIncomingDatagramStream::new(incoming),
@@ -246,15 +247,15 @@ impl UdpStream {
     }
 }
 
-async fn bind_socket(addr: SocketAddr) -> io::Result<wasip2::sockets::udp::UdpSocket> {
+async fn bind_socket(addr: SocketAddr) -> io::Result<WasiUdpSocket> {
     let family = match addr {
         SocketAddr::V4(_) => IpAddressFamily::Ipv4,
         SocketAddr::V6(_) => IpAddressFamily::Ipv6,
     };
     let socket = create_udp_socket(family).map_err(to_io_err)?;
-    let network = instance_network();
     let local_address = sockaddr_to_wasi(addr);
 
+    let network = instance_network();
     socket
         .start_bind(&network, local_address)
         .map_err(to_io_err)?;

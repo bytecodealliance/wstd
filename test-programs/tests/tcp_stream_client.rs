@@ -2,19 +2,21 @@ use anyhow::{Context, Result};
 use std::net::{Shutdown, TcpListener};
 use std::process::{Command, Stdio};
 
-#[test_log::test]
-fn tcp_stream_client() -> Result<()> {
+fn run(component: &str, p3: bool) -> Result<()> {
     use std::io::{Read, Write};
 
-    let server = TcpListener::bind("127.0.0.1:8082").context("binding temporary test server")?;
+    let server = TcpListener::bind("127.0.0.1:0").context("binding temporary test server")?;
     let addr = server
         .local_addr()
         .context("getting local listener address")?;
 
-    let child = Command::new("wasmtime")
-        .arg("run")
-        .arg("-Sinherit-network")
-        .arg(test_programs::TCP_STREAM_CLIENT)
+    let mut command = Command::new("wasmtime");
+    command.arg("run").arg("-Sinherit-network");
+    if p3 {
+        command.arg("-Sp3");
+    }
+    let child = command
+        .arg(component)
         .arg(addr.to_string())
         .stdout(Stdio::piped())
         .spawn()
@@ -50,4 +52,15 @@ fn tcp_stream_client() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[test_log::test]
+fn tcp_stream_client_p2() -> Result<()> {
+    run(test_programs::TCP_STREAM_CLIENT, false)
+}
+
+#[cfg(wstd_nightly)]
+#[test_log::test]
+fn tcp_stream_client_p3() -> Result<()> {
+    run(test_programs::TCP_STREAM_CLIENT_P3, true)
 }

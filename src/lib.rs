@@ -62,7 +62,6 @@ pub mod future;
 pub mod http;
 pub mod io;
 pub mod iter;
-#[cfg(all(target_os = "wasi", target_env = "p2"))]
 pub mod net;
 pub mod rand;
 pub mod runtime;
