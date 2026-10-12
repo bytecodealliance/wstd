@@ -1,4 +1,3 @@
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
 //! Support for the [`axum`] web server framework in wasi-http components, via
 //! [`wstd`].
 //!

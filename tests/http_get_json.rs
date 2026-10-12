@@ -1,5 +1,3 @@
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
-
 use serde::Deserialize;
 use std::error::Error;
 use wstd::http::{Body, Client, Request};

@@ -20,7 +20,7 @@ fn run(component: &str, p3: bool) -> Result<()> {
         .stdout(std::process::Stdio::piped())
         .spawn()?;
 
-    let addr = get_listening_address(wasmtime_process.stdout.take().expect("stdout is piped"))?;
+    let addr = get_listening_address(wasmtime_process.stdout.as_mut().expect("stdout is piped"))?;
 
     println!("tcp echo server is listening on {addr:?}");
 

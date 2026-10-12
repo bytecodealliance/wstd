@@ -6,16 +6,26 @@ const COUNT: usize = 2;
 
 #[test_log::test]
 fn weather() -> Result<()> {
+    run(test_programs::axum::WEATHER)
+}
+
+#[cfg(wstd_nightly)]
+#[cfg_attr(wstd_nightly, ignore)]
+#[test_log::test]
+fn weather_p3() -> Result<()> {
+    run(test_programs::axum::WEATHER_P3)
+}
+
+fn run(component: &str) -> Result<()> {
     // Run wasmtime serve.
-    let _serve = test_programs::WasmtimeServe::new(test_programs::axum::WEATHER)?;
+    let serve = test_programs::WasmtimeServe::new(component)?;
+    let addr = serve.get_listening_address();
 
     // TEST /weather weather handler
-    let body = ureq::get(format!(
-        "http://127.0.0.1:8081/weather?city={CITY}&count={COUNT}"
-    ))
-    .call()?
-    .body_mut()
-    .read_json::<Value>()?;
+    let body = ureq::get(format!("http://{addr}/weather?city={CITY}&count={COUNT}"))
+        .call()?
+        .body_mut()
+        .read_json::<Value>()?;
     let array = body.as_array().expect("json body is an array");
     assert_eq!(array.len(), COUNT);
     let item_0 = &array[0];

@@ -1,6 +1,3 @@
-#![cfg_attr(not(all(target_os = "wasi", target_env = "p2")), no_main)]
-#![cfg(all(target_os = "wasi", target_env = "p2"))]
-
 use anyhow::{Context, Result};
 use futures_lite::stream::{once_future, unfold};
 use http_body_util::{BodyExt, StreamBody};
