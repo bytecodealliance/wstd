@@ -2,7 +2,7 @@
 name: approved contributors
 on:
   schedule:
-    - cron: "*/5 * * * *"
+#    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
