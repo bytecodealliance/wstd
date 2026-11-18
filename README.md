@@ -52,6 +52,8 @@ applications in Rust before async-std, smol, or tokio land support for Wasm
 Components and WASI 0.2. Once those runtimes land support, it is recommended
 users switch to use those instead.
 
+This is a sentence to help @phickey test some tooling in CI.
+
 ## Examples
 
 **TCP echo server**
