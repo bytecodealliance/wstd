@@ -1,7 +1,7 @@
 # Copy to .github/workflows/ in the repository you want to protect.
 name: approved contributors
 on:
-  schedule:
+#  schedule:
 #    - cron: "*/5 * * * *"
   workflow_dispatch:
 
