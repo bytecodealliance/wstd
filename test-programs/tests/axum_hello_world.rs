@@ -5,7 +5,6 @@ fn hello_world() -> Result<()> {
     run(test_programs::axum::HELLO_WORLD)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn hello_world_p3() -> Result<()> {
     run(test_programs::axum::HELLO_WORLD_P3)
@@ -16,7 +15,6 @@ fn hello_world_nomacro() -> Result<()> {
     run(test_programs::axum::HELLO_WORLD_NOMACRO)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn hello_world_nomacro_p3() -> Result<()> {
     run(test_programs::axum::HELLO_WORLD_NOMACRO_P3)

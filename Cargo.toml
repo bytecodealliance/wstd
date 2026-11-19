@@ -64,7 +64,7 @@ license = "Apache-2.0 WITH LLVM-exception"
 repository = "https://github.com/bytecodealliance/wstd"
 keywords = ["WebAssembly", "async", "stdlib", "Components"]
 categories = ["wasm", "asynchronous"]
-rust-version = "1.92.0"
+rust-version = "1.100.0"
 authors = [
     "Yoshua Wuyts <rust@yosh.is>",
     "Pat Hickey <pat@moreproductive.org>",

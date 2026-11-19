@@ -6,7 +6,6 @@ use std::process::Command;
 
 fn main() {
     let out_dir = PathBuf::from(var_os("OUT_DIR").expect("OUT_DIR env var exists"));
-    let nightly_toolchain = is_nightly_toolchain();
 
     let meta = MetadataCommand::new()
         .exec()
@@ -16,13 +15,6 @@ fn main() {
         "cargo:rerun-if-changed={}",
         meta.workspace_root.as_os_str().to_str().unwrap()
     );
-
-    // TODO: Remove this nightly only cfg once wasm32-wasip3 is available on
-    // stable.
-    println!("cargo::rustc-check-cfg=cfg(wstd_nightly)");
-    if nightly_toolchain {
-        println!("cargo:rustc-cfg=wstd_nightly");
-    }
 
     fn build_target(pkg: &str, manifest: &str, kind: &str, target: &str, out_dir: &Path) {
         // release build is required for aws sdk to not overflow wasm locals
@@ -42,34 +34,16 @@ fn main() {
         assert!(status.success());
     }
 
-    fn build_targets(
-        pkg: &str,
-        manifest: &str,
-        kind: &str,
-        nightly_toolchain: bool,
-        out_dir: &Path,
-    ) {
+    fn build_targets(pkg: &str, manifest: &str, kind: &str, build_p3: bool, out_dir: &Path) {
         build_target(pkg, manifest, kind, "wasm32-wasip2", out_dir);
 
-        if nightly_toolchain {
+        if build_p3 {
             build_target(pkg, manifest, kind, "wasm32-wasip3", out_dir);
         }
     }
 
-    build_targets(
-        "wstd",
-        "../Cargo.toml",
-        "--examples",
-        nightly_toolchain,
-        &out_dir,
-    );
-    build_targets(
-        "wstd-axum",
-        "../Cargo.toml",
-        "--examples",
-        nightly_toolchain,
-        &out_dir,
-    );
+    build_targets("wstd", "../Cargo.toml", "--examples", true, &out_dir);
+    build_targets("wstd-axum", "../Cargo.toml", "--examples", true, &out_dir);
     build_targets(
         "wstd-aws-example",
         "../aws-example/Cargo.toml",
@@ -150,21 +124,6 @@ fn main() {
     );
 
     std::fs::write(out_dir.join("gen.rs"), generated_code).unwrap();
-}
-
-fn is_nightly_toolchain() -> bool {
-    let rustc = var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    let output = Command::new(rustc)
-        .arg("--version")
-        .output()
-        .expect("query active rustc version");
-    assert!(
-        output.status.success(),
-        "failed to query active rustc version"
-    );
-    String::from_utf8(output.stdout)
-        .expect("rustc version is UTF-8")
-        .contains("-nightly")
 }
 
 fn rustflags() -> &'static str {

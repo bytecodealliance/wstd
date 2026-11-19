@@ -54,7 +54,6 @@ fn stdio_p2() -> Result<()> {
     run(test_programs::STDIO, false)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn stdio_p3() -> Result<()> {
     run(test_programs::STDIO_P3, true)

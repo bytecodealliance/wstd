@@ -59,7 +59,6 @@ fn tcp_stream_client_p2() -> Result<()> {
     run(test_programs::TCP_STREAM_CLIENT, false)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn tcp_stream_client_p3() -> Result<()> {
     run(test_programs::TCP_STREAM_CLIENT_P3, true)
