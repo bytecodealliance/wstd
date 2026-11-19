@@ -33,13 +33,8 @@ runs:
         # override` has higher precedence though.
         rustup override set "${{ steps.select.outputs.version }}"
 
-        rustup target add wasm32-wasip2
-
-        if [ "${{ inputs.toolchain }}" = "nightly" ]; then
-          rustup target add wasm32-wasip3
-          rustup component add rustfmt
-          rustup component add clippy
-        fi
+        rustup target add wasm32-wasip2 wasm32-wasip3
+        rustup component add rustfmt clippy
 
         # Save disk space by avoiding incremental compilation. Also turn down
         # debuginfo from 2 to 0 to help save disk space.

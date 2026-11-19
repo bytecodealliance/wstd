@@ -6,7 +6,6 @@ fn http_server() -> Result<()> {
     run(test_programs::HTTP_SERVER)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn http_server_p3() -> Result<()> {
     run(test_programs::HTTP_SERVER_P3)

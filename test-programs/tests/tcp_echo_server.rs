@@ -91,7 +91,6 @@ fn tcp_echo_server_p2() -> Result<()> {
     run(test_programs::TCP_ECHO_SERVER, false)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn tcp_echo_server_p3() -> Result<()> {
     run(test_programs::TCP_ECHO_SERVER_P3, true)

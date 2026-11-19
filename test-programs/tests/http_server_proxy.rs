@@ -5,7 +5,6 @@ fn http_server_proxy() -> Result<()> {
     run(test_programs::HTTP_SERVER, test_programs::HTTP_SERVER_PROXY)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn http_server_proxy_p3() -> Result<()> {
     run(

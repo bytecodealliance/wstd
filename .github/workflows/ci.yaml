@@ -54,17 +54,13 @@ jobs:
     - name: check p2
       run: cargo check --workspace --all --bins --examples --target wasm32-wasip2
 
-    # TODO: remove all nightly conditions for p3 targets once wasm32-wasip3 is
-    # stable.
     - name: check p3
-      if: matrix.rust == 'nightly'
       run: cargo check --workspace --all --bins --examples --target wasm32-wasip3
 
     - name: wstd p2 tests
       run: cargo test -p wstd -p wstd-axum --target wasm32-wasip2 -- --nocapture
 
     - name: wstd p3 tests
-      if: matrix.rust == 'nightly'
       run: cargo test -p wstd -p wstd-axum --target wasm32-wasip3 -- --nocapture
 
     - name: test-programs tests
@@ -81,8 +77,6 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - uses: ./.github/actions/install-rust
-      with:
-        toolchain: nightly
 
     - name: fmt
       run: cargo fmt --all -- --check
@@ -105,8 +99,6 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - uses: ./.github/actions/install-rust
-      with:
-        toolchain: nightly
     - run: rustc ci/publish.rs
     # Make sure we can bump version numbers for the next release
     - run: ./publish bump

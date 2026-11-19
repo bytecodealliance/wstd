@@ -72,7 +72,6 @@ fn udp_echo_server_p2() -> Result<()> {
     run(test_programs::UDP_ECHO_SERVER, false)
 }
 
-#[cfg(wstd_nightly)]
 #[test_log::test]
 fn udp_echo_server_p3() -> Result<()> {
     run(test_programs::UDP_ECHO_SERVER_P3, true)
