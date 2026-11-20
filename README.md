@@ -1,7 +1,7 @@
 <h1 align="center">wstd</h1>
 <div align="center">
   <strong>
-    An async Rust standard library for Wasm Components and WASI 0.2
+    An async Rust standard library for Wasm Components and WASI 0.2 and 0.3
   </strong>
 </div>
 
@@ -49,8 +49,8 @@
 This is a minimal async Rust standard library written exclusively to support
 Wasm Components. It exists primarily to enable people to write async-based
 applications in Rust before async-std, smol, or tokio land support for Wasm
-Components and WASI 0.2. Once those runtimes land support, it is recommended
-users switch to use those instead.
+Components and WASI 0.2 and 0.3. Once those runtimes land support, it is
+recommended users switch to use those instead.
 
 ## Examples
 
