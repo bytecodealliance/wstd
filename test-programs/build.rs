@@ -34,22 +34,17 @@ fn main() {
         assert!(status.success());
     }
 
-    fn build_targets(pkg: &str, manifest: &str, kind: &str, build_p3: bool, out_dir: &Path) {
+    fn build_targets(pkg: &str, manifest: &str, kind: &str, out_dir: &Path) {
         build_target(pkg, manifest, kind, "wasm32-wasip2", out_dir);
-
-        if build_p3 {
-            build_target(pkg, manifest, kind, "wasm32-wasip3", out_dir);
-        }
+        build_target(pkg, manifest, kind, "wasm32-wasip3", out_dir);
     }
 
-    build_targets("wstd", "../Cargo.toml", "--examples", true, &out_dir);
-    build_targets("wstd-axum", "../Cargo.toml", "--examples", true, &out_dir);
+    build_targets("wstd", "../Cargo.toml", "--examples", &out_dir);
+    build_targets("wstd-axum", "../Cargo.toml", "--examples", &out_dir);
     build_targets(
         "wstd-aws-example",
         "../aws-example/Cargo.toml",
         "--bins",
-        // TODO: enable when aws example is running for WASIp3
-        false,
         &out_dir,
     );
 
