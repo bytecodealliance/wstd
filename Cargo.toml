@@ -78,7 +78,6 @@ axum = { version = "0.8.6", default-features = false }
 bytes = "1.10.1"
 cargo_metadata = "0.22"
 clap = { version = "4.5.26", features = ["derive"] }
-futures-core = "0.3.19"
 futures-lite = "2.6.1"
 futures-concurrency = "7.6"
 humantime = "2.1.0"
@@ -92,17 +91,14 @@ quote = "1.0"
 serde= "1"
 serde_json = "1"
 serde_qs = "0.15"
-sync_wrapper = "1"
 slab = "0.4.9"
 syn = "2.0"
 test-log = { version = "0.2", features = ["trace"] }
-test-programs = { path = "test-programs" }
 tower-service = "0.3.3"
 ureq = { version = "3.1", default-features = false, features = ["json"] }
 wasip2 = "1.0"
 wasip3 = "0.8"
 wstd = { path = ".", version = "=0.6.8" }
-wstd-axum = { path = "./axum", version = "=0.6.8" }
 wstd-axum-macro = { path = "./axum/macro", version = "=0.6.8" }
 wstd-macro = { path = "./macro", version = "=0.6.8" }
 
