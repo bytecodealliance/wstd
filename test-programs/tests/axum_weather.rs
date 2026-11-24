@@ -9,7 +9,6 @@ fn weather() -> Result<()> {
     run(test_programs::axum::WEATHER)
 }
 
-#[ignore]
 #[test_log::test]
 fn weather_p3() -> Result<()> {
     run(test_programs::axum::WEATHER_P3)
